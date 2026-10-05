@@ -1,0 +1,18 @@
+{
+  "id": "mise",
+  "name": "mise",
+  "description": "Install and upgrade mise tools: bar widget with outdated count + launcher install",
+  "version": "0.1.0",
+  "author": "Villoh",
+  "icon": "package_2",
+  "type": "composite",
+  "capabilities": ["dankbar-widget", "launcher"],
+  "components": {
+    "widget": "./MiseBar.qml",
+    "launcher": "./MiseLauncher.qml"
+  },
+  "settings": "./MiseSettings.qml",
+  "trigger": "mise",
+  "requires_dms": ">=1.5.0",
+  "permissions": ["process", "settings_read", "settings_write"]
+}

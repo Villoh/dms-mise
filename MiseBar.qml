@@ -1,0 +1,666 @@
+import QtQuick
+import qs.Common
+import qs.Widgets
+import QtQuick.Effects
+import qs.Modules.Plugins
+
+PluginComponent {
+    id: root
+
+    layerNamespacePlugin: "mise"
+    popoutWidth: 460
+    popoutHeight: 600
+
+    readonly property int count: MiseService.outdated.length
+    readonly property bool working: MiseService.busy || MiseService.checking
+    readonly property int bumpCount: MiseService.bumps.length
+    // primary = updates, warning (orange) = only bumps pending
+    readonly property color pillColor: MiseService.error ? Theme.error : (count > 0 ? Theme.primary : (bumpCount > 0 ? Theme.warning : Theme.surfaceVariantText))
+
+    // mise logo (assets/mise.svg, black line art) recoloured to a theme colour.
+    // Inline: a new type in qmldir is not picked up by `plugins reload`.
+    component MiseIcon: Item {
+        id: ic
+
+        property int size: 24
+        property color color: "white"
+        property bool pulse: false
+
+        implicitWidth: size
+        implicitHeight: size
+
+        // Qt5Compat is not installed with DMS: tint via a colour rect masked by the logo.
+        Image {
+            id: logo
+            anchors.fill: parent
+            source: Qt.resolvedUrl("assets/mise.svg")
+            sourceSize.width: ic.size * 2
+            sourceSize.height: ic.size * 2
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+            visible: false
+            layer.enabled: true
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            color: ic.color
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                maskEnabled: true
+                maskSource: logo
+            }
+        }
+
+        SequentialAnimation on opacity {
+            running: ic.pulse
+            loops: Animation.Infinite
+            onRunningChanged: if (!running)
+                ic.opacity = 1
+            NumberAnimation {
+                to: 0.35
+                duration: 600
+            }
+            NumberAnimation {
+                to: 1
+                duration: 600
+            }
+        }
+    }
+
+    // touching the singleton instantiates it (lazy) and starts polling
+    Component.onCompleted: MiseService.refresh()
+
+    horizontalBarPill: Component {
+        Row {
+            spacing: Theme.spacingXS
+            MiseIcon {
+                size: root.iconSize + 2
+                color: root.pillColor
+                pulse: root.working
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            StyledText {
+                visible: root.count > 0
+                text: root.count
+                font.pixelSize: Theme.fontSizeMedium
+                color: Theme.primary
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Row {
+                visible: root.bumpCount > 0
+                spacing: 1
+                anchors.verticalCenter: parent.verticalCenter
+                DankIcon {
+                    name: "arrow_upward"
+                    size: root.iconSize - 4
+                    color: Theme.warning
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+                StyledText {
+                    text: root.bumpCount
+                    font.pixelSize: Theme.fontSizeMedium
+                    color: Theme.warning
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+        }
+    }
+
+    verticalBarPill: Component {
+        Column {
+            spacing: Theme.spacingXS
+            MiseIcon {
+                size: root.iconSize + 2
+                color: root.pillColor
+                pulse: root.working
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+            StyledText {
+                visible: root.count > 0
+                text: root.count
+                font.pixelSize: Theme.fontSizeSmall
+                color: Theme.primary
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+            Row {
+                visible: root.bumpCount > 0
+                spacing: 1
+                anchors.horizontalCenter: parent.horizontalCenter
+                DankIcon {
+                    name: "arrow_upward"
+                    size: root.iconSize - 6
+                    color: Theme.warning
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+                StyledText {
+                    text: root.bumpCount
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.warning
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+        }
+    }
+
+    popoutContent: Component {
+        PopoutComponent {
+            id: pop
+            headerText: "mise"
+            detailsText: MiseService.error || ((root.count > 0 ? root.count + " outdated" : "All up to date") + (MiseService.bumps.length ? " · " + MiseService.bumps.length + " bumpable" : "") + " · " + MiseService.installed.length + " installed" + checkedText)
+            showCloseButton: true
+
+            property int tab: 0            // 0 = updates, 1 = tools (installed + install)
+            property string updFilter: ""
+            property string query: ""
+            property string backend: ""     // backend chip filter ("" = all)
+            readonly property string checkedText: {
+                if (!MiseService.lastCheck)
+                    return "";
+                const m = Math.round((Date.now() - MiseService.lastCheck) / 60000);
+                return " · checked " + (m < 1 ? "just now" : m + "m ago");
+            }
+            readonly property bool searching: tab === 1 && query.trim() !== ""
+            // in-range updates first, then bump-only (pinned / newer major) rows
+            readonly property var updRows: MiseService.outdated.map(t => ({
+                        name: t.name,
+                        requested: t.requested,
+                        current: t.current,
+                        latest: t.latest,
+                        bump: false
+                    })).concat(MiseService.bumps.map(t => ({
+                            name: t.name,
+                            requested: t.requested,
+                            current: t.current,
+                            latest: t.bump,
+                            bump: true
+                        })))
+            // ignored entries as rows: "name" or "name@version"
+            readonly property var ignoredRows: MiseService.ignored.map(k => {
+                const m = k.match(/^(.*)@([^\/@:]+)$/);
+                return {
+                    name: m ? m[1] : k,
+                    requested: "",
+                    current: "",
+                    latest: m ? m[2] : "",
+                    bump: false,
+                    ignoredKey: k
+                };
+            })
+            readonly property bool ignoredView: tab === 0 && backend === "__ignored"
+            readonly property var baseNames: tab === 0 ? updRows.map(t => t.name) : MiseService.installed
+            readonly property var backends: {
+                const c = {};
+                baseNames.forEach(n => {
+                    const b = MiseService.backendOf(n);
+                    c[b] = (c[b] || 0) + 1;
+                });
+                return Object.keys(c).sort().map(k => ({
+                            key: k,
+                            label: k + " " + c[k]
+                        }));
+            }
+            readonly property var updList: (ignoredView ? ignoredRows : updRows).filter(t => t.name.toLowerCase().includes(updFilter.trim().toLowerCase()) && (!backend || ignoredView || MiseService.backendOf(t.name) === backend))
+            // tools tab: no query -> what you have installed; query -> installed matches, then registry hits
+            readonly property var toolList: {
+                const q = query.trim().toLowerCase();
+                const inst = n => ({
+                        name: n,
+                        installed: true,
+                        direct: false,
+                        sub: MiseService.versions[n] || ""
+                    });
+                if (!q)
+                    return MiseService.installed.filter(n => !backend || MiseService.backendOf(n) === backend).slice().sort().map(inst);
+                return MiseService.installed.filter(n => n.toLowerCase().includes(q)).slice().sort().map(inst).concat(MiseService.search(query).filter(r => !r.installed).map(r => ({
+                                name: r.name,
+                                installed: false,
+                                direct: r.direct,
+                                sub: r.backend
+                            })));
+            }
+            readonly property int shown: tab === 0 ? updList.length : toolList.length
+
+            Item {
+                width: parent.width
+                implicitHeight: root.popoutHeight - pop.headerHeight - pop.detailsHeight - Theme.spacingXL
+
+                // ---- toolbar: tabs + refresh ----
+                Item {
+                    id: toolbar
+                    width: parent.width
+                    height: 40
+
+                    DankButtonGroup {
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        buttonHeight: 36
+                        model: ["Updates" + (root.count > 0 ? " (" + root.count + ")" : ""), "Tools"]
+                        currentIndex: pop.tab
+                        onSelectionChanged: (index, selected) => {
+                            if (selected)
+                                pop.tab = index;
+                        }
+                    }
+
+                    DankActionButton {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        iconName: "refresh"
+                        tooltipText: "Check for updates"
+                        enabled: !MiseService.checking && !MiseService.busy
+                        onClicked: MiseService.refresh()
+                    }
+                }
+
+                // ---- job banner: what mise is doing right now ----
+                Rectangle {
+                    id: banner
+                    anchors.top: toolbar.bottom
+                    anchors.topMargin: Theme.spacingS
+                    width: parent.width
+                    visible: MiseService.busy
+                    height: visible ? bannerCol.implicitHeight + Theme.spacingM * 2 : 0
+                    radius: Theme.cornerRadius
+                    color: Theme.withAlpha(Theme.primary, 0.10)
+                    border.width: 1
+                    border.color: Theme.withAlpha(Theme.primary, 0.30)
+
+                    Column {
+                        id: bannerCol
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.margins: Theme.spacingM
+                        spacing: 2
+                        Row {
+                            spacing: Theme.spacingS
+                            DankIcon {
+                                name: "sync"
+                                size: Theme.iconSize - 6
+                                color: Theme.primary
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                            StyledText {
+                                text: MiseService.jobLabel + "…"
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.weight: Font.Medium
+                                color: Theme.surfaceText
+                                anchors.verticalCenter: parent.verticalCenter
+                            }
+                        }
+                        StyledText {
+                            width: parent.width
+                            text: MiseService.jobLog.length ? MiseService.jobLog[MiseService.jobLog.length - 1] : ""
+                            font.pixelSize: Theme.fontSizeSmall - 1
+                            font.family: "monospace"
+                            color: Theme.surfaceVariantText
+                            elide: Text.ElideRight
+                            wrapMode: Text.NoWrap
+                            maximumLineCount: 1
+                        }
+                    }
+                }
+
+                // ---- search / filter field ----
+                DankTextField {
+                    id: field
+                    anchors.top: banner.bottom
+                    anchors.topMargin: Theme.spacingS
+                    width: parent.width
+                    height: 40
+                    leftIconName: "search"
+                    showClearButton: true
+                    placeholderText: pop.tab === 0 ? "Filter updates…" : "Search installed & registry, or type backend:tool…"
+                    onTextEdited: {
+                        if (pop.tab === 0)
+                            pop.updFilter = text;
+                        else
+                            pop.query = text;
+                    }
+                    // Enter installs the top not-yet-installed hit
+                    onAccepted: {
+                        if (pop.tab !== 1 || MiseService.busy)
+                            return;
+                        const r = pop.toolList.find(x => !x.installed);
+                        if (r)
+                            MiseService.install(r.name);
+                    }
+                }
+
+                DankButton {
+                    id: updAll
+                    visible: pop.tab === 0
+                    anchors.bottom: parent.bottom
+                    width: bumpAll.visible ? (parent.width - Theme.spacingS) / 2 : parent.width
+                    text: root.count > 0 ? "Update all (" + root.count + ")" : "Update all"
+                    iconName: "upgrade"
+                    buttonHeight: 44
+                    enabled: root.count > 0 && !MiseService.busy
+                    onClicked: MiseService.upgrade("")
+                }
+
+                // rewrites pins in your config: arm first, click again to confirm
+                DankButton {
+                    id: bumpAll
+                    property bool armed: false
+                    visible: pop.tab === 0 && MiseService.bumps.length > 0
+                    anchors.bottom: parent.bottom
+                    anchors.right: parent.right
+                    width: (parent.width - Theme.spacingS) / 2
+                    text: armed ? "Confirm bump (" + MiseService.bumps.length + ")" : "Bump all (" + MiseService.bumps.length + ")"
+                    iconName: armed ? "check" : "upgrade"
+                    buttonHeight: 44
+                    backgroundColor: armed ? Theme.error : Theme.warning
+                    textColor: Theme.surface
+                    enabled: !MiseService.busy
+                    onClicked: {
+                        if (!armed) {
+                            armed = true;
+                            bumpReset.restart();
+                        } else {
+                            armed = false;
+                            MiseService.bumpAll();
+                        }
+                    }
+                    Timer {
+                        id: bumpReset
+                        interval: 3000
+                        onTriggered: bumpAll.armed = false
+                    }
+                }
+
+                Connections {
+                    target: MiseService
+                    function onIgnoredChanged() {
+                        if (MiseService.ignored.length === 0 && pop.backend === "__ignored")
+                            pop.backend = "";
+                    }
+                }
+
+                // switching tabs: show that tab's own text
+                Connections {
+                    target: pop
+                    function onTabChanged() {
+                        pop.backend = "";
+                        field.text = pop.tab === 0 ? pop.updFilter : pop.query;
+                    }
+                }
+
+                // ---- backend filter chips (updates, or tools when not searching) ----
+                Flickable {
+                    id: chips
+                    anchors.top: field.bottom
+                    anchors.topMargin: visible ? Theme.spacingS : 0
+                    width: parent.width
+                    visible: !pop.searching && (pop.backends.length > 1 || (pop.tab === 0 && MiseService.ignored.length > 0))
+                    height: visible ? 30 : 0
+                    contentWidth: chipRow.width
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    Row {
+                        id: chipRow
+                        spacing: Theme.spacingXS
+                        Repeater {
+                            model: [{
+                                    key: "",
+                                    label: "All"
+                                }].concat(pop.backends, pop.tab === 0 && MiseService.ignored.length > 0 ? [{
+                                    key: "__ignored",
+                                    label: "ignored " + MiseService.ignored.length
+                                }] : [])
+                            delegate: Rectangle {
+                                required property var modelData
+                                readonly property bool active: pop.backend === modelData.key
+                                height: 30
+                                width: chipLabel.implicitWidth + Theme.spacingM * 2
+                                radius: height / 2
+                                color: active ? Theme.primary : Theme.surfaceContainerHigh
+                                StyledText {
+                                    id: chipLabel
+                                    anchors.centerIn: parent
+                                    text: modelData.label
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: parent.active ? Theme.primaryText : Theme.surfaceText
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: pop.backend = modelData.key
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ---- lists ----
+                Rectangle {
+                    anchors.top: chips.bottom
+                    anchors.topMargin: Theme.spacingS
+                    anchors.bottom: updAll.visible ? updAll.top : parent.bottom
+                    anchors.bottomMargin: updAll.visible ? Theme.spacingS : 0
+                    width: parent.width
+                    radius: Theme.cornerRadius
+                    color: Theme.withAlpha(Theme.surfaceVariant, 0.1)
+
+                    StyledText {
+                        anchors.centerIn: parent
+                        width: parent.width - Theme.spacingL * 2
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
+                        color: MiseService.error && pop.tab === 0 ? Theme.error : Theme.surfaceVariantText
+                        font.pixelSize: Theme.fontSizeMedium
+                        visible: pop.shown === 0
+                        text: {
+                            if (pop.tab === 0) {
+                                if (MiseService.error)
+                                    return MiseService.error;
+                                if (MiseService.checking)
+                                    return "Checking for updates…";
+                                return root.count > 0 ? "No updates match" : "Everything is up to date";
+                            }
+                            if (!pop.searching)
+                                return "Nothing installed yet.\nType a name, or any backend:tool\ne.g. pipx:package, npm:package, cargo:crate, github:owner/repo\nOptions: pipx:package[uvx_args=--python 3.14]";
+                            return MiseService.registry.length ? "No matches. Use backend:tool to install anything else." : "Loading registry…";
+                        }
+                    }
+
+                    // updates
+                    DankListView {
+                        anchors.fill: parent
+                        anchors.margins: Theme.spacingS
+                        visible: pop.tab === 0 && pop.updList.length > 0
+                        clip: true
+                        spacing: Theme.spacingXS
+                        model: pop.updList
+
+                        delegate: Rectangle {
+                            required property var modelData
+                            width: ListView.view ? ListView.view.width : 0
+                            height: 52
+                            radius: Theme.cornerRadius
+                            color: updHover.containsMouse ? Theme.primaryHoverLight : "transparent"
+                            MouseArea {
+                                id: updHover
+                                anchors.fill: parent
+                                hoverEnabled: true
+                            }
+                            DankIcon {
+                                id: updIcon
+                                anchors.left: parent.left
+                                anchors.leftMargin: Theme.spacingM
+                                anchors.verticalCenter: parent.verticalCenter
+                                name: modelData.ignoredKey ? "visibility_off" : (modelData.bump ? "upgrade" : "arrow_circle_up")
+                                size: Theme.iconSize - 4
+                                color: modelData.ignoredKey ? Theme.surfaceVariantText : (modelData.bump ? Theme.warning : Theme.primary)
+                            }
+                            Column {
+                                anchors.left: updIcon.right
+                                anchors.leftMargin: Theme.spacingM
+                                anchors.right: updBtns.left
+                                anchors.rightMargin: Theme.spacingS
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 1
+                                StyledText {
+                                    width: parent.width
+                                    text: modelData.name
+                                    font.pixelSize: Theme.fontSizeMedium
+                                    font.weight: Font.Medium
+                                    color: modelData.ignoredKey ? Theme.surfaceVariantText : Theme.surfaceText
+                                    elide: Text.ElideRight
+                                    wrapMode: Text.NoWrap
+                                    maximumLineCount: 1
+                                }
+                                StyledText {
+                                    width: parent.width
+                                    text: modelData.ignoredKey ? (modelData.latest ? "skipping " + modelData.latest : "ignored · all versions") : modelData.current + " → " + modelData.latest + (modelData.bump ? " · bump (requested " + modelData.requested + ")" : "")
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.surfaceVariantText
+                                    elide: Text.ElideRight
+                                    wrapMode: Text.NoWrap
+                                    maximumLineCount: 1
+                                }
+                            }
+                            Row {
+                                id: updBtns
+                                anchors.right: parent.right
+                                anchors.rightMargin: Theme.spacingXS
+                                anchors.verticalCenter: parent.verticalCenter
+                                DankActionButton {
+                                    visible: !!modelData.ignoredKey
+                                    buttonSize: 34
+                                    iconSize: 20
+                                    iconName: "undo"
+                                    iconColor: Theme.primary
+                                    tooltipText: "Stop ignoring"
+                                    onClicked: MiseService.unignore(modelData.ignoredKey)
+                                }
+                                DankActionButton {
+                                    visible: !modelData.ignoredKey
+                                    buttonSize: 34
+                                    iconSize: 20
+                                    iconName: "skip_next"
+                                    iconColor: Theme.surfaceVariantText
+                                    tooltipText: "Skip " + modelData.latest + " (shows again with a newer version)"
+                                    onClicked: MiseService.ignore(modelData.name, modelData.latest)
+                                }
+                                DankActionButton {
+                                    visible: !modelData.ignoredKey
+                                    buttonSize: 34
+                                    iconSize: 20
+                                    iconName: "visibility_off"
+                                    iconColor: Theme.surfaceVariantText
+                                    tooltipText: "Ignore " + modelData.name + " (all versions)"
+                                    onClicked: MiseService.ignore(modelData.name, "")
+                                }
+                                DankActionButton {
+                                    visible: !modelData.ignoredKey
+                                    buttonSize: 34
+                                    iconSize: 20
+                                    iconName: modelData.bump ? "upgrade" : "download"
+                                    iconColor: modelData.bump ? Theme.warning : Theme.primary
+                                    tooltipText: modelData.bump ? "Bump: rewrites \"" + modelData.requested + "\" in your mise config" : "Update"
+                                    enabled: !MiseService.busy
+                                    onClicked: modelData.bump ? MiseService.bump(modelData.name) : MiseService.upgrade(modelData.name)
+                                }
+                            }
+                        }
+                    }
+
+                    // tools: installed (version + remove) and installable (download)
+                    DankListView {
+                        anchors.fill: parent
+                        anchors.margins: Theme.spacingS
+                        visible: pop.tab === 1 && pop.toolList.length > 0
+                        clip: true
+                        spacing: Theme.spacingXS
+                        model: pop.toolList
+
+                        delegate: Rectangle {
+                            id: row
+                            required property var modelData
+                            property bool confirm: false   // remove is two-step
+                            width: ListView.view ? ListView.view.width : 0
+                            height: 52
+                            radius: Theme.cornerRadius
+                            color: rowHover.containsMouse ? Theme.primaryHoverLight : "transparent"
+                            MouseArea {
+                                id: rowHover
+                                anchors.fill: parent
+                                hoverEnabled: true
+                            }
+                            Timer {
+                                id: confirmReset
+                                interval: 3000
+                                onTriggered: row.confirm = false
+                            }
+                            DankIcon {
+                                id: rowIcon
+                                anchors.left: parent.left
+                                anchors.leftMargin: Theme.spacingM
+                                anchors.verticalCenter: parent.verticalCenter
+                                name: modelData.installed ? "check_circle" : (modelData.direct ? "add_circle" : "download")
+                                size: Theme.iconSize - 4
+                                color: modelData.installed ? Theme.surfaceVariantText : Theme.primary
+                            }
+                            Column {
+                                anchors.left: rowIcon.right
+                                anchors.leftMargin: Theme.spacingM
+                                anchors.right: rowBtn.left
+                                anchors.rightMargin: Theme.spacingS
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 1
+                                StyledText {
+                                    width: parent.width
+                                    text: modelData.name
+                                    font.pixelSize: Theme.fontSizeMedium
+                                    font.weight: Font.Medium
+                                    color: Theme.surfaceText
+                                    elide: Text.ElideRight
+                                    wrapMode: Text.NoWrap
+                                    maximumLineCount: 1
+                                }
+                                StyledText {
+                                    width: parent.width
+                                    visible: text !== ""
+                                    text: modelData.sub
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    font.family: "monospace"
+                                    color: Theme.surfaceVariantText
+                                    elide: Text.ElideRight
+                                    wrapMode: Text.NoWrap
+                                    maximumLineCount: 1
+                                }
+                            }
+                            DankActionButton {
+                                id: rowBtn
+                                anchors.right: parent.right
+                                anchors.rightMargin: Theme.spacingS
+                                anchors.verticalCenter: parent.verticalCenter
+                                buttonSize: 36
+                                // installed: red bin, first click arms (red check), second removes
+                                // not installed: download = install
+                                iconName: modelData.installed ? (row.confirm ? "check" : "delete") : "download"
+                                iconColor: modelData.installed ? (row.confirm ? Theme.surface : Theme.error) : Theme.primary
+                                backgroundColor: row.confirm ? Theme.error : "transparent"
+                                tooltipText: modelData.installed ? (row.confirm ? "Click again to remove" : "Remove") : "Install"
+                                enabled: !MiseService.busy
+                                onClicked: {
+                                    if (!modelData.installed) {
+                                        MiseService.install(modelData.name);
+                                    } else if (!row.confirm) {
+                                        row.confirm = true;
+                                        confirmReset.restart();
+                                    } else {
+                                        MiseService.uninstall(modelData.name);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
