@@ -68,7 +68,7 @@ PluginSettings {
 
         Item {
             width: parent.width
-            height: 36
+            height: Theme.iconSize + Theme.spacingM
 
             StyledText {
                 anchors.left: parent.left
@@ -85,7 +85,7 @@ PluginSettings {
                 visible: ignoredSection.entries.length > 0
                 text: "Clear all"
                 iconName: "delete_sweep"
-                buttonHeight: 32
+                buttonHeight: Theme.iconSize + Theme.spacingS
                 onClicked: PluginService.savePluginState("mise", "ignored", [])
             }
         }
@@ -102,7 +102,7 @@ PluginSettings {
         // at most 6 rows tall, scrolls beyond that
         DankListView {
             width: parent.width
-            height: Math.min(ignoredSection.entries.length, 6) * 44
+            height: Math.min(ignoredSection.entries.length, 6) * (Theme.iconSize + Theme.spacingL + Theme.spacingXS)
             visible: ignoredSection.entries.length > 0
             clip: true
             spacing: Theme.spacingXS
@@ -110,7 +110,7 @@ PluginSettings {
             delegate: Rectangle {
                 required property var modelData
                 width: ListView.view ? ListView.view.width : 0
-                height: 40
+                height: Theme.iconSize + Theme.spacingL
                 radius: Theme.cornerRadius
                 color: Theme.withAlpha(Theme.surfaceVariant, 0.1)
 
@@ -133,8 +133,8 @@ PluginSettings {
                     anchors.right: parent.right
                     anchors.rightMargin: Theme.spacingXS
                     anchors.verticalCenter: parent.verticalCenter
-                    buttonSize: 32
-                    iconSize: 18
+                    buttonSize: Theme.iconSize + Theme.spacingS
+                    iconSize: Theme.iconSize - Theme.spacingS
                     iconName: "undo"
                     iconColor: Theme.primary
                     tooltipText: "Stop ignoring"

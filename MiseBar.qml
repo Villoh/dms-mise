@@ -17,12 +17,19 @@ PluginComponent {
     // primary = updates, warning (orange) = only bumps pending
     readonly property color pillColor: MiseService.error ? Theme.error : (count > 0 ? Theme.primary : (bumpCount > 0 ? Theme.warning : Theme.surfaceVariantText))
 
+    // sizes derived from theme tokens, so they follow the user's font / icon scaling
+    readonly property real controlH: Theme.iconSize + Theme.spacingL
+    readonly property real rowH: Theme.fontSizeMedium + Theme.fontSizeSmall + Theme.spacingXL + Theme.spacingXS
+    readonly property real chipH: Theme.iconSizeLarge - Theme.spacingXXS
+    readonly property real iconBtn: Theme.iconSize + Theme.spacingM
+    readonly property real actionIcon: Theme.iconSize - Theme.spacingXS
+
     // mise logo (assets/mise.svg, black line art) recoloured to a theme colour.
     // Inline: a new type in qmldir is not picked up by `plugins reload`.
     component MiseIcon: Item {
         id: ic
 
-        property int size: 24
+        property int size: Theme.iconSize
         property color color: "white"
         property bool pulse: false
 
@@ -229,12 +236,12 @@ PluginComponent {
                 Item {
                     id: toolbar
                     width: parent.width
-                    height: 40
+                    height: root.controlH
 
                     DankButtonGroup {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
-                        buttonHeight: 36
+                        buttonHeight: root.iconBtn
                         model: ["Updates" + (root.count > 0 ? " (" + root.count + ")" : ""), "Tools"]
                         currentIndex: pop.tab
                         onSelectionChanged: (index, selected) => {
@@ -292,8 +299,8 @@ PluginComponent {
                         StyledText {
                             width: parent.width
                             text: MiseService.jobLog.length ? MiseService.jobLog[MiseService.jobLog.length - 1] : ""
-                            font.pixelSize: Theme.fontSizeSmall - 1
-                            font.family: "monospace"
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.family: Theme.monoFontFamily
                             color: Theme.surfaceVariantText
                             elide: Text.ElideRight
                             wrapMode: Text.NoWrap
@@ -308,7 +315,7 @@ PluginComponent {
                     anchors.top: banner.bottom
                     anchors.topMargin: Theme.spacingS
                     width: parent.width
-                    height: 40
+                    height: root.controlH
                     leftIconName: "search"
                     showClearButton: true
                     placeholderText: pop.tab === 0 ? "Filter updates…" : "Search installed & registry, or type backend:tool…"
@@ -335,7 +342,7 @@ PluginComponent {
                     width: bumpAll.visible ? (parent.width - Theme.spacingS) / 2 : parent.width
                     text: root.count > 0 ? "Update all (" + root.count + ")" : "Update all"
                     iconName: "upgrade"
-                    buttonHeight: 44
+                    buttonHeight: root.controlH + Theme.spacingXS
                     enabled: root.count > 0 && !MiseService.busy
                     onClicked: MiseService.upgrade("")
                 }
@@ -350,7 +357,7 @@ PluginComponent {
                     width: (parent.width - Theme.spacingS) / 2
                     text: armed ? "Confirm bump (" + MiseService.bumps.length + ")" : "Bump all (" + MiseService.bumps.length + ")"
                     iconName: armed ? "check" : "upgrade"
-                    buttonHeight: 44
+                    buttonHeight: root.controlH + Theme.spacingXS
                     backgroundColor: armed ? Theme.error : Theme.warning
                     textColor: Theme.surface
                     enabled: !MiseService.busy
@@ -413,7 +420,7 @@ PluginComponent {
                             delegate: Rectangle {
                                 required property var modelData
                                 readonly property bool active: pop.backend === modelData.key
-                                height: 30
+                                height: root.chipH
                                 width: chipLabel.implicitWidth + Theme.spacingM * 2
                                 radius: height / 2
                                 color: active ? Theme.primary : Theme.surfaceContainerHigh
@@ -478,7 +485,7 @@ PluginComponent {
                         delegate: Rectangle {
                             required property var modelData
                             width: ListView.view ? ListView.view.width : 0
-                            height: 52
+                            height: root.rowH
                             radius: Theme.cornerRadius
                             color: updHover.containsMouse ? Theme.primaryHoverLight : "transparent"
                             MouseArea {
@@ -529,8 +536,8 @@ PluginComponent {
                                 anchors.verticalCenter: parent.verticalCenter
                                 DankActionButton {
                                     visible: !!modelData.ignoredKey
-                                    buttonSize: 34
-                                    iconSize: 20
+                                    buttonSize: root.iconBtn
+                                    iconSize: root.actionIcon
                                     iconName: "undo"
                                     iconColor: Theme.primary
                                     tooltipText: "Stop ignoring"
@@ -538,8 +545,8 @@ PluginComponent {
                                 }
                                 DankActionButton {
                                     visible: !modelData.ignoredKey
-                                    buttonSize: 34
-                                    iconSize: 20
+                                    buttonSize: root.iconBtn
+                                    iconSize: root.actionIcon
                                     iconName: "skip_next"
                                     iconColor: Theme.surfaceVariantText
                                     tooltipText: "Skip " + modelData.latest + " (shows again with a newer version)"
@@ -547,8 +554,8 @@ PluginComponent {
                                 }
                                 DankActionButton {
                                     visible: !modelData.ignoredKey
-                                    buttonSize: 34
-                                    iconSize: 20
+                                    buttonSize: root.iconBtn
+                                    iconSize: root.actionIcon
                                     iconName: "visibility_off"
                                     iconColor: Theme.surfaceVariantText
                                     tooltipText: "Ignore " + modelData.name + " (all versions)"
@@ -556,8 +563,8 @@ PluginComponent {
                                 }
                                 DankActionButton {
                                     visible: !modelData.ignoredKey
-                                    buttonSize: 34
-                                    iconSize: 20
+                                    buttonSize: root.iconBtn
+                                    iconSize: root.actionIcon
                                     iconName: modelData.bump ? "upgrade" : "download"
                                     iconColor: modelData.bump ? Theme.warning : Theme.primary
                                     tooltipText: modelData.bump ? "Bump: rewrites \"" + modelData.requested + "\" in your mise config" : "Update"
@@ -582,7 +589,7 @@ PluginComponent {
                             required property var modelData
                             property bool confirm: false   // remove is two-step
                             width: ListView.view ? ListView.view.width : 0
-                            height: 52
+                            height: root.rowH
                             radius: Theme.cornerRadius
                             color: rowHover.containsMouse ? Theme.primaryHoverLight : "transparent"
                             MouseArea {
@@ -626,7 +633,7 @@ PluginComponent {
                                     visible: text !== ""
                                     text: modelData.sub
                                     font.pixelSize: Theme.fontSizeSmall
-                                    font.family: "monospace"
+                                    font.family: Theme.monoFontFamily
                                     color: Theme.surfaceVariantText
                                     elide: Text.ElideRight
                                     wrapMode: Text.NoWrap
@@ -638,7 +645,7 @@ PluginComponent {
                                 anchors.right: parent.right
                                 anchors.rightMargin: Theme.spacingS
                                 anchors.verticalCenter: parent.verticalCenter
-                                buttonSize: 36
+                                buttonSize: root.iconBtn
                                 // installed: red bin, first click arms (red check), second removes
                                 // not installed: download = install
                                 iconName: modelData.installed ? (row.confirm ? "check" : "delete") : "download"
