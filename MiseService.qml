@@ -17,7 +17,6 @@ Item {
     property bool remoteSearch: true  // query npm / crates.io / GitHub as you type (Settings)
     property string lookupQ: ""       // last query handed to lookup()
     property var remoteHits: ({})     // backend -> [{name: "npm:foo", backend, desc}], from the last answer
-    property var pypiTop: null        // [{name, dl}] 15k most downloaded PyPI projects, fetched on the first pipx:/pypi: search
     readonly property var remote: Object.keys(searchers).reduce((a, k) => a.concat(remoteHits[k] || []), [])
     property var verified: ({})       // "npm:foo" -> {ok, desc}; absent = not checked yet / network error
     // debounce pending or a request in flight: UIs show a "searching" hint.
@@ -130,7 +129,7 @@ Item {
 
     // Backends we can search. `free` = also searched for plain text; the rest only after their
     // prefix, or free text would drown in results (and GitHub allows 10 searches/min unauthenticated).
-    // Not searchable (no usable API): go, aqua, gitlab, ubi, spm, http, s3, asdf, vfox.
+    // Not searchable (no usable API): aqua, gitlab, ubi, spm, http, s3, asdf, vfox.
     readonly property var searchers: ({
             npm: {
                 free: true,
@@ -173,15 +172,11 @@ Item {
                             }));
                 }
             },
-            // PyPI has no search API: pipx:/pypi: filter the pypiTop list locally (see pypiHits)
-            pipx: {
-                free: false,
-                url: (t, n) => ""
-            },
-            pypi: {
-                free: false,
-                url: (t, n) => ""
-            },
+            // PyPI and Go have no search API: use the one behind deps.dev's own website (Google's Open
+            // Source Insights). Unofficial and undocumented, may change without notice.
+            pipx: depsDev("pypi"),
+            pypi: depsDev("pypi"),
+            go: depsDev("go"),
             gem: {
                 free: false,
                 url: (t, n) => "https://rubygems.org/api/v1/search.json?query=" + encodeURIComponent(t),
@@ -257,13 +252,6 @@ Item {
         // `@scope/...` and paths are not search terms
         if (t.length < 3 || /^[@/]|:\/\//.test(t))
             return;
-        if (b === "pipx" || b === "pypi") {
-            if (pypiTop)
-                pypiHits(b, t);
-            else
-                pypiFetch.start("https://hugovk.dev/top-pypi-packages/top-pypi-packages.min.json", t);
-            return;
-        }
         // always ask, even when the registry has the name: skipping would leave the hits of an
         // earlier, shorter query on screen and the list would depend on how you typed
         const n = b ? maxPrefixed : maxFree;
@@ -276,33 +264,20 @@ Item {
         });
     }
 
-    // PyPI names are compared normalized (PEP 503: runs of - _ . are the same)
-    function pypiHits(b, t) {
-        const q = t.toLowerCase().replace(/[-_.]+/g, "-");
-        const score = r => r.name === q ? 0 : r.name.startsWith(q) ? 1 : 2;
-        const n = d => d >= 1e9 ? (d / 1e9).toFixed(1) + "B" : d >= 1e6 ? Math.round(d / 1e6) + "M" : d >= 1e3 ? Math.round(d / 1e3) + "k" : String(d);
-        const m = Object.assign({}, remoteHits);
-        // best match first, then the most downloaded
-        m[b] = pypiTop.filter(r => r.name.includes(q)).sort((x, y) => score(x) - score(y) || y.dl - x.dl).slice(0, maxPrefixed).map(r => ({
-                    name: b + ":" + r.name,
-                    backend: b,
-                    desc: n(r.dl) + " downloads / 30 days"
-                }));
-        remoteHits = m;
+    // searcher for one deps.dev ecosystem; results mix packages and GitHub projects, keep the packages
+    function depsDev(system) {
+        return {
+            free: false,
+            url: (t, n) => "https://deps.dev/_/search?q=" + encodeURIComponent(t) + "&system=" + system,
+            parse: j => (j.results || []).filter(r => r.kind === "PACKAGE").map(r => ({
+                        name: r.name,
+                        desc: r.defaultVersion ? "latest " + r.defaultVersion : ""
+                    }))
+        };
     }
 
     // answer of a search request
     function gotHits(b, status, json, term) {
-        if (b === "pypi-top") {
-            if (status === 200 && json && json.rows) {
-                pypiTop = json.rows.map(r => ({
-                            name: r.project,
-                            dl: r.download_count
-                        }));
-                fetchRemote();   // the query that asked for it is still the one on screen
-            }
-            return;
-        }
         if (status !== 200 || !json)
             return;
         const m = Object.assign({}, remoteHits);
@@ -383,8 +358,16 @@ Item {
         id: verifyFetch
     }
     Fetch {
+        id: pipxFetch
+        backend: "pipx"
+    }
+    Fetch {
         id: pypiFetch
-        backend: "pypi-top"
+        backend: "pypi"
+    }
+    Fetch {
+        id: goFetch
+        backend: "go"
     }
     Fetch {
         id: npmFetch
@@ -411,7 +394,9 @@ Item {
         backend: "dotnet"
     }
     readonly property var fetchers: ({
-            "pypi-top": pypiFetch,
+            pipx: pipxFetch,
+            pypi: pypiFetch,
+            go: goFetch,
             npm: npmFetch,
             cargo: cargoFetch,
             github: githubFetch,
