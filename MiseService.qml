@@ -828,6 +828,38 @@ Item {
         }
     }
 
+    // `http:` form: what does `latest` resolve to for the typed spec? (`mise latest` follows the list order and
+    // version_order, which a count of versions would not show.) Answers for an older spec are dropped, and
+    // only the newest request waits behind a running one.
+    property var httpCheck: ({})   // {spec, pending, latest}
+    function checkHttp(spec) {
+        httpCheck = {
+            spec: spec,
+            pending: true
+        };
+        checkAsk.queue = [];
+        checkAsk.ask(spec);
+    }
+
+    Ask {
+        id: checkAsk
+        args: t => ["latest", t]
+        // mise caches the version list by tool name, not by options: without this a changed url or path
+        // would still answer from the first list
+        environment: ({
+                MISE_FETCH_REMOTE_VERSIONS_CACHE: "0"
+            })
+        onAnswer: (tool, body) => {
+            if (root.httpCheck.spec !== tool)
+                return;
+            root.httpCheck = {
+                spec: tool,
+                pending: false,
+                latest: body.trim()
+            };
+        }
+    }
+
     // removes that one installed version; the config is not touched
     function uninstallVersion(tool, version) {
         run(["uninstall", "--yes", tool + "@" + version], "Removing " + tool + "@" + version, "Removed " + tool + "@" + version);
