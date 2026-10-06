@@ -3,6 +3,10 @@ name: CI
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
+  # main is checked again after each merge, in case two PRs that passed
+  # separately break each other
+  push:
+    branches: [main]
 
 permissions:
   contents: read
@@ -12,6 +16,7 @@ jobs:
   # Merge commits are skipped, and only the commits of this PR are checked:
   # older history predates the convention.
   conventional:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
