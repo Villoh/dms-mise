@@ -44,6 +44,7 @@ jobs:
             daemon
             service
             settings
+            release
           requireScope: false
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -56,7 +57,7 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           types='feat|fix|refactor|perf|style|docs|chore|build|ci'
-          scopes='widget|panel|launcher|daemon|service|settings'
+          scopes='widget|panel|launcher|daemon|service|settings|release'
           re="^($types)(\(($scopes)\))?!?: [^A-Z].*[^.]\$"
           bad=0
           while IFS= read -r subject; do
