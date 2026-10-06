@@ -15,6 +15,7 @@ PluginComponent {
     id: root
 
     readonly property bool windowMode: root.pluginData?.panelMode === "window"
+    readonly property string startTab: root.pluginData?.panelTab ?? "auto"
     readonly property real panelW: Math.round(Theme.fontSizeMedium * 34)
     readonly property real panelH: Math.round(Theme.fontSizeMedium * 46)
     readonly property bool shown: windowMode ? win.visible : modal.shouldBeVisible
@@ -65,6 +66,7 @@ PluginComponent {
     component Body: FocusScope {
         id: body
 
+        property string startTab: "auto"
         property bool canMaximize: false
         property bool maximized: false
         property alias panel: panel
@@ -78,7 +80,7 @@ PluginComponent {
         focus: true
         Keys.onEscapePressed: body.closeRequested()
         Component.onCompleted: {
-            panel.pickInitialTab();
+            panel.pickInitialTab(body.startTab);
             Qt.callLater(panel.focusSearch);
         }
 
@@ -171,13 +173,14 @@ PluginComponent {
 
         onClosed: win.visible = false
         onVisibleChanged: if (visible) {
-            winBody.panel.pickInitialTab();
+            winBody.panel.pickInitialTab(winBody.startTab);
             Qt.callLater(winBody.panel.focusSearch);
         }
 
         Body {
             id: winBody
             anchors.fill: parent
+            startTab: root.startTab
             canMaximize: wc.canMaximize
             maximized: win.maximized
             onHeaderPressed: wc.tryStartMove()
@@ -215,6 +218,7 @@ PluginComponent {
         Body {
             width: modal.modalWidth
             height: modal.modalHeight
+            startTab: root.startTab
 
             property var grab: Qt.point(0, 0)
             property var start: Qt.point(0, 0)

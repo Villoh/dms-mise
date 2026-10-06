@@ -18,9 +18,10 @@ Item {
 
     readonly property string summary: MiseService.error || ((count > 0 ? count + " outdated" : "All up to date") + (bumpCount ? " · " + bumpCount + " bumpable" : "") + " · " + MiseService.installed.length + " installed" + checkedText)
 
-    // on open: Updates if something is pending (updates or bumps), Tools otherwise
-    function pickInitialTab() {
-        tab = (count > 0 || bumpCount > 0) ? 0 : 1;
+    // on open. "updates" / "tools" are fixed; anything else is auto:
+    // Updates if something is pending (updates or bumps), Tools otherwise
+    function pickInitialTab(mode) {
+        tab = mode === "updates" ? 0 : mode === "tools" ? 1 : (count > 0 || bumpCount > 0) ? 0 : 1;
     }
 
     function focusSearch() {
