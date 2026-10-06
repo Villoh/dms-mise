@@ -889,7 +889,7 @@ Item {
                                 property bool armed: false   // removing a version is two-step
                                 readonly property bool have: ((row.info.meta || {}).installed_versions || []).includes(modelData)
                                 readonly property bool active: ((row.info.meta || {}).active_versions || []).includes(modelData)
-                                width: Theme.spacingM + chipRow.implicitWidth + (trashBtn.visible ? Theme.spacingS + trashBtn.width + trashBtn.anchors.rightMargin : Theme.spacingM)
+                                width: Theme.spacingM + verRow.implicitWidth + (trashBtn.visible ? Theme.spacingS + trashBtn.width + trashBtn.anchors.rightMargin : Theme.spacingM)
                                 height: pop.chipH
                                 radius: Theme.cornerRadius
                                 color: chipArea.containsMouse && !MiseService.busy ? Theme.primaryHoverLight : chip.active ? Theme.withAlpha(Theme.primary, 0.2) : "transparent"
@@ -910,7 +910,7 @@ Item {
                                     onClicked: MiseService.install(MiseService.bareName(row.modelData.name) + "@" + chip.modelData, row.modelData.scope)
                                 }
                                 Row {
-                                    id: chipRow
+                                    id: verRow
                                     anchors.left: parent.left
                                     anchors.leftMargin: Theme.spacingM
                                     anchors.verticalCenter: parent.verticalCenter
