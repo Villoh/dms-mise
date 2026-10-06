@@ -155,8 +155,10 @@ QtObject {
         else if (kind === "bump")
             MiseService.bump(tool, scope);
         else if (kind === "upgrade")
-            MiseService.upgrade(tool, tool ? scope : undefined);   // no tool = Upgrade all, every scope
-        else if (kind === "install")
+            MiseService.upgrade(tool, tool ? scope : undefined);
+        else
+        // no tool = Upgrade all, every scope
+        if (kind === "install")
             MiseService.install(tool, scope);
     }
 }

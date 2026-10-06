@@ -30,11 +30,26 @@ PluginSettings {
         label: "Check interval"
         description: "How often to look for updates"
         options: [
-            {label: "15 minutes", value: "15"},
-            {label: "30 minutes", value: "30"},
-            {label: "1 hour", value: "60"},
-            {label: "4 hours", value: "240"},
-            {label: "Once a day", value: "1440"}
+            {
+                label: "15 minutes",
+                value: "15"
+            },
+            {
+                label: "30 minutes",
+                value: "30"
+            },
+            {
+                label: "1 hour",
+                value: "60"
+            },
+            {
+                label: "4 hours",
+                value: "240"
+            },
+            {
+                label: "Once a day",
+                value: "1440"
+            }
         ]
         defaultValue: "30"
     }
@@ -44,8 +59,14 @@ PluginSettings {
         label: "Keybind panel"
         description: "What `dms ipc call mise toggle` opens. Overlay: centered over everything, closes on click outside, drag the header to move it. Window: a real window, so the border and rounding come from your compositor config, and it moves and resizes natively."
         options: [
-            {label: "Overlay", value: "modal"},
-            {label: "Window", value: "window"}
+            {
+                label: "Overlay",
+                value: "modal"
+            },
+            {
+                label: "Window",
+                value: "window"
+            }
         ]
         defaultValue: "modal"
     }
@@ -55,9 +76,18 @@ PluginSettings {
         label: "Keybind panel opens on"
         description: "Auto: Updates if something is pending (updates or bumps), Tools otherwise."
         options: [
-            {label: "Auto", value: "auto"},
-            {label: "Updates", value: "updates"},
-            {label: "Tools", value: "tools"}
+            {
+                label: "Auto",
+                value: "auto"
+            },
+            {
+                label: "Updates",
+                value: "updates"
+            },
+            {
+                label: "Tools",
+                value: "tools"
+            }
         ]
         defaultValue: "auto"
     }
@@ -81,9 +111,18 @@ PluginSettings {
         label: "Project tools"
         description: "Also list, update, install and remove tools of project configs (mise.toml), not just the global one. Off: global only. Manual: only the projects you add below. Tracked: every config mise has already seen, plus the ones you add."
         options: [
-            {label: "Off", value: "off"},
-            {label: "Manual", value: "manual"},
-            {label: "Tracked", value: "tracked"}
+            {
+                label: "Off",
+                value: "off"
+            },
+            {
+                label: "Manual",
+                value: "manual"
+            },
+            {
+                label: "Tracked",
+                value: "tracked"
+            }
         ]
         defaultValue: "off"
     }
@@ -94,8 +133,14 @@ PluginSettings {
         label: "Bar badge counts"
         description: "Global: only the global config, as before. Global + projects: also the updates and bumps of the projects you follow. The popout always shows the scope you pick there."
         options: [
-            {label: "Global", value: "global"},
-            {label: "Global + projects", value: "all"}
+            {
+                label: "Global",
+                value: "global"
+            },
+            {
+                label: "Global + projects",
+                value: "all"
+            }
         ]
         defaultValue: "global"
     }
@@ -190,9 +235,9 @@ PluginSettings {
                         path: p,
                         hidden: false
                     })).concat(MiseService.projectsMode === "tracked" ? MiseService.hiddenProjects.filter(p => MiseService.trackedProjects.includes(p) && !MiseService.projects.includes(p)).map(p => ({
-                                path: p,
-                                hidden: true
-                            })) : []) : []
+                        path: p,
+                        hidden: true
+                    })) : []) : []
             delegate: Rectangle {
                 required property var modelData
                 width: projectsSection.width

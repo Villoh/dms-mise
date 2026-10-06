@@ -219,10 +219,10 @@ Item {
         }
         const acc = projProc.acc;
         const e = acc[path] || (acc[path] = {
-            outdated: [],
-            bump: [],
-            tools: {}
-        });
+                outdated: [],
+                bump: [],
+                tools: {}
+            });
         // `mise` run in a project also reports the global tools: keep only what this config declares
         if (kind === "ls") {
             Object.keys(d).forEach(n => {
@@ -305,22 +305,22 @@ Item {
         const score = r => r.name === base ? 0 : r.name.startsWith(base) ? 1 : r.name.includes(base) ? 2 : 3;
         hits.sort((a, b) => score(a) - score(b) || a.name.length - b.name.length);
         hits.slice(0, 12).forEach(r => out.push({
-                    name: r.name,
-                    backend: r.backend,
-                    installed: isInstalled(r.name),
-                    direct: false
-                }));
+                name: r.name,
+                backend: r.backend,
+                installed: isInstalled(r.name),
+                direct: false
+            }));
         // remote hits for what is being typed: free text -> backends marked `free`, `backend:q` -> that one.
         // Older hits that still match stay visible while the next request is in flight.
         const cap = b ? maxPrefixed : maxFree;   // per backend
         const seen = {};
         if (remoteSearch && term)
             remote.filter(r => (b ? r.backend === b : searchers[r.backend].free) && r.name.toLowerCase().includes(term) && r.name !== raw && !out.some(o => o.name === r.name) && (seen[r.backend] = (seen[r.backend] || 0) + 1) <= cap).forEach(r => out.push({
-                        name: r.name,
-                        backend: r.backend + " · " + r.desc,
-                        installed: isInstalled(r.name),
-                        direct: false
-                    }));
+                    name: r.name,
+                    backend: r.backend + " · " + r.desc,
+                    installed: isInstalled(r.name),
+                    direct: false
+                }));
         return out;
     }
 
@@ -339,25 +339,25 @@ Item {
                 // found by typing them exactly (exact-name check).
                 url: (t, n) => "https://registry.npmjs.org/-/v1/search?size=" + n + "&text=" + encodeURIComponent(t.toLowerCase()),
                 parse: j => (j.objects || []).map(o => ({
-                            name: o.package.name,
-                            desc: o.package.description
-                        }))
+                                name: o.package.name,
+                                desc: o.package.description
+                            }))
             },
             cargo: {
                 free: true,
                 url: (t, n) => "https://crates.io/api/v1/crates?per_page=" + n + "&q=" + encodeURIComponent(t),
                 parse: j => (j.crates || []).map(o => ({
-                            name: o.name,
-                            desc: o.description
-                        }))
+                                name: o.name,
+                                desc: o.description
+                            }))
             },
             github: {
                 free: false,
                 url: (t, n) => t.includes("/") ? "" : "https://api.github.com/search/repositories?per_page=" + n + "&q=" + encodeURIComponent(t),
                 parse: j => (j.items || []).map(o => ({
-                            name: o.full_name,
-                            desc: o.description
-                        }))
+                                name: o.full_name,
+                                desc: o.description
+                            }))
             },
             // anaconda.org searches every channel at once (up to 100 hits, 1-3 s) and ignores channel
             // filters: keep conda-forge, the channel mise installs from, best match first
@@ -382,17 +382,17 @@ Item {
                 free: false,
                 url: (t, n) => "https://rubygems.org/api/v1/search.json?query=" + encodeURIComponent(t),
                 parse: j => (Array.isArray(j) ? j : []).map(o => ({
-                            name: o.name,
-                            desc: o.info
-                        }))
+                                name: o.name,
+                                desc: o.info
+                            }))
             },
             dotnet: {
                 free: false,
                 url: (t, n) => "https://azuresearch-usnc.nuget.org/query?take=" + n + "&q=" + encodeURIComponent(t),
                 parse: j => (j.data || []).map(o => ({
-                            name: o.id,
-                            desc: o.description
-                        }))
+                                name: o.id,
+                                desc: o.description
+                            }))
             }
         })
 
@@ -471,9 +471,9 @@ Item {
             free: false,
             url: (t, n) => "https://deps.dev/_/search?q=" + encodeURIComponent(t) + "&system=" + system,
             parse: j => (j.results || []).filter(r => r.kind === "PACKAGE").map(r => ({
-                        name: r.name,
-                        desc: r.defaultVersion ? "latest " + r.defaultVersion : ""
-                    }))
+                            name: r.name,
+                            desc: r.defaultVersion ? "latest " + r.defaultVersion : ""
+                        }))
         };
     }
 
@@ -681,10 +681,12 @@ Item {
     // no tool = all the visible ones of `scope` (every scope when omitted), so ignored tools are not
     // upgraded behind your back
     function upgrade(tool, scope) {
-        const rows = tool ? [{
-                    name: tool,
-                    scope: scope || ""
-                }] : inFilter(outdated, scope);
+        const rows = tool ? [
+            {
+                name: tool,
+                scope: scope || ""
+            }
+        ] : inFilter(outdated, scope);
         if (!rows.length)
             return;
         runMany(perScope(rows, ["upgrade", "--yes"]), tool ? "Upgrading " + tool + inLabel(scope) : "Upgrading all tools", tool ? "Upgraded " + tool + inLabel(scope) : "Upgraded all tools");

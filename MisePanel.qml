@@ -48,16 +48,19 @@ Item {
     // where Install writes: the picked scope, global when looking at everything
     readonly property string target: scope === "*" ? "" : scope
     readonly property bool showScope: scope === "*" && MiseService.scopes.length > 0
-    readonly property var scopeOptions: [{
+    readonly property var scopeOptions: [
+        {
             key: "",
             label: "Global"
-        }, {
+        },
+        {
             key: "*",
             label: "All"
-        }].concat(MiseService.scopes.map(s => ({
-                    key: s,
-                    label: MiseService.scopeLabel(s)
-                })))
+        }
+    ].concat(MiseService.scopes.map(s => ({
+                key: s,
+                label: MiseService.scopeLabel(s)
+            })))
     readonly property string scopeName: scope === "*" ? "All" : scope === "" ? "Global" : MiseService.scopeLabel(scope)
     function inScope(r) {
         return scope === "*" || r.scope === scope;
@@ -90,13 +93,13 @@ Item {
                 scope: t.scope,
                 bump: false
             })).concat(MiseService.bumps.map(t => ({
-                    name: t.name,
-                    requested: t.requested,
-                    current: t.current,
-                    latest: t.bump,
-                    scope: t.scope,
-                    bump: true
-                })))
+                name: t.name,
+                requested: t.requested,
+                current: t.current,
+                latest: t.bump,
+                scope: t.scope,
+                bump: true
+            })))
     // what the Update all / Bump all buttons act on: the picked scope
     readonly property int scopedCount: updRows.filter(r => !r.bump && inScope(r)).length
     readonly property int scopedBumps: updRows.filter(r => r.bump && inScope(r)).length
@@ -119,12 +122,12 @@ Item {
         (scope === "*" ? [""].concat(MiseService.scopes) : [scope]).forEach(s => {
             const v = MiseService.toolsIn(s);
             MiseService.installedIn(s).forEach(n => out.push({
-                        name: n,
-                        scope: s,
-                        installed: true,
-                        direct: false,
-                        sub: (v[n] || "") + (showScope ? (v[n] ? " · " : "") + MiseService.scopeLabel(s) : "")
-                    }));
+                    name: n,
+                    scope: s,
+                    installed: true,
+                    direct: false,
+                    sub: (v[n] || "") + (showScope ? (v[n] ? " · " : "") + MiseService.scopeLabel(s) : "")
+                }));
         });
         return out.sort((a, b) => a.name.localeCompare(b.name) || a.scope.localeCompare(b.scope));
     }
@@ -147,15 +150,14 @@ Item {
         if (!q)
             return installedRows.filter(r => !backend || MiseService.backendOf(r.name) === backend);
         return installedRows.filter(r => r.name.toLowerCase().includes(q)).concat(MiseService.search(query, target).filter(r => !r.installed).map(r => ({
-                        name: r.name,
-                        scope: target,
-                        installed: false,
-                        direct: r.direct,
-                        sub: r.backend + (scope === "*" && MiseService.scopes.length ? " · installs globally" : "")
-                    })));
+                    name: r.name,
+                    scope: target,
+                    installed: false,
+                    direct: r.direct,
+                    sub: r.backend + (scope === "*" && MiseService.scopes.length ? " · installs globally" : "")
+                })));
     }
     readonly property int shown: tab === 0 ? updList.length : toolList.length
-
 
     // ---- toolbar: tabs + refresh ----
     Item {
@@ -465,13 +467,17 @@ Item {
             id: chipRow
             spacing: Theme.spacingXS
             Repeater {
-                model: [{
+                model: [
+                    {
                         key: "",
                         label: "All"
-                    }].concat(pop.backends, pop.tab === 0 && MiseService.ignored.length > 0 ? [{
+                    }
+                ].concat(pop.backends, pop.tab === 0 && MiseService.ignored.length > 0 ? [
+                    {
                         key: "__ignored",
                         label: "ignored " + MiseService.ignored.length
-                    }] : [])
+                    }
+                ] : [])
                 delegate: Rectangle {
                     required property var modelData
                     readonly property bool active: pop.backend === modelData.key
