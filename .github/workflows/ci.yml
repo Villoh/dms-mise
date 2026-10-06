@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  # main is checked again after each merge, in case two PRs that passed
+  # separately break each other
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # PR title and every commit follow AGENTS.md (Conventional Commits).
+  # Merge commits are skipped, and only the commits of this PR are checked:
+  # older history predates the convention.
+  conventional:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      # v6.1.1
+      # yamllint disable-line rule:line-length
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            refactor
+            perf
+            style
+            docs
+            chore
+            build
+            ci
+          scopes: |
+            widget
+            panel
+            launcher
+            daemon
+            service
+            settings
+          requireScope: false
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Commit subjects
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          types='feat|fix|refactor|perf|style|docs|chore|build|ci'
+          scopes='widget|panel|launcher|daemon|service|settings'
+          re="^($types)(\(($scopes)\))?!?: [^A-Z].*[^.]\$"
+          bad=0
+          while IFS= read -r subject; do
+            if ! [[ "$subject" =~ $re ]] || [ "${#subject}" -gt 72 ]; then
+              echo "::error::bad commit subject: $subject"
+              bad=1
+            fi
+          done < <(git log --no-merges --format=%s "$BASE..$HEAD")
+          exit $bad
+
+  plugin-json:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Valid manifest
+        run: |
+          jq -e '.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$")' plugin.json
+          jq -e '.id and .name and .type and .requires_dms' plugin.json \
+            >/dev/null
+          # every QML file the manifest points to exists
+          missing=0
+          for f in $(jq -r '[.components[], .settings] | .[]' plugin.json); do
+            if ! [ -f "$f" ]; then
+              echo "::error::plugin.json points to missing $f"
+              missing=1
+            fi
+          done
+          exit $missing
+
+  qml-format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # v31.11.1
+      # yamllint disable-line rule:line-length
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24
+
+      # Same pinned Qt as qml-lint: every Qt version formats a bit differently.
+      # Fix locally with the same command plus -i, see AGENTS.md.
+      - name: qmlformat
+        env:
+          NIXPKGS: github:NixOS/nixpkgs/aa48d347080940b8a2b8d2f48228674e280a3514
+        run: |
+          nix shell "$NIXPKGS#qt6.qtdeclarative" -c qmlformat -i *.qml
+          git diff --exit-code
+
+  qml-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # v31.11.1
+      # yamllint disable-line rule:line-length
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24
+
+      # Syntax and structure only (duplicated ids, bad bindings, ...).
+      # The Quickshell / DMS types (qs.Common, Quickshell.Io, ...) are not
+      # available here, so every check that needs them is off.
+      # Qt is pinned through the nixpkgs revision, so the lint does not
+      # change under the repo.
+      - name: qmllint
+        env:
+          NIXPKGS: github:NixOS/nixpkgs/aa48d347080940b8a2b8d2f48228674e280a3514
+        run: |
+          nix shell "$NIXPKGS#qt6.qtdeclarative" -c qmllint \
+            --import disable --unresolved-type disable --unqualified disable \
+            --missing-property disable --missing-type disable \
+            --compiler disable *.qml
