@@ -302,7 +302,7 @@ Item {
             const note = v ? (v.ok ? " · ✓" + (v.desc ? " " + v.desc : "") : " · ✗ not found") : "";
             out.push({
                 name: name,
-                backend: (isInstalled(bare) && bare !== raw ? "re-pin " + bare + " (now " + (toolsHere[bare] || "?") + ")" : "direct · " + (c > 0 ? raw.substring(0, c) : reg.backend)) + note,
+                backend: (isInstalled(bare) && bare !== raw ? "re-pin " + bare + " (now " + (toolsHere[bare] || "?") + ")" : (v && v.ok ? "" : "direct · ") + (c > 0 ? raw.substring(0, c) : reg.backend)) + note,
                 installed: raw === bare && isInstalled(name),
                 direct: true
             });
