@@ -774,6 +774,8 @@ Item {
                     const v = info.versions || [];
                     return (v.length ? ["latest"] : []).concat(v, ((info.meta || {}).installed_versions || []).filter(x => !v.includes(x)));
                 }
+                // config says `latest`: the `latest` chip is the active one, the version it resolved to is just installed
+                readonly property bool trackLatest: ((info.meta || {}).requested_versions || []).includes("latest")
                 property bool pruneArmed: false   // prune is two-step, like remove
                 width: ListView.view ? ListView.view.width : 0
                 height: open ? pop.rowH + details.implicitHeight + Theme.spacingS : pop.rowH
@@ -969,7 +971,8 @@ Item {
                                 required property string modelData
                                 property bool armed: false   // removing a version is two-step
                                 readonly property bool have: ((row.info.meta || {}).installed_versions || []).includes(modelData)
-                                readonly property bool active: ((row.info.meta || {}).active_versions || []).includes(modelData)
+                                readonly property bool inUse: ((row.info.meta || {}).active_versions || []).includes(modelData)
+                                readonly property bool active: modelData === "latest" ? row.trackLatest : !row.trackLatest && inUse
                                 width: Theme.spacingM + verRow.implicitWidth + (trashBtn.visible ? Theme.spacingS + trashBtn.width + trashBtn.anchors.rightMargin : Theme.spacingM)
                                 height: pop.chipH
                                 radius: Theme.cornerRadius
@@ -1013,7 +1016,7 @@ Item {
                                 // installed, not the active one (that one goes with the tool's own bin)
                                 Rectangle {
                                     id: trashBtn
-                                    visible: chip.have && !chip.active
+                                    visible: chip.have && !chip.inUse
                                     anchors.right: parent.right
                                     anchors.rightMargin: (parent.height - height) / 2   // same gap on every side
                                     anchors.verticalCenter: parent.verticalCenter
