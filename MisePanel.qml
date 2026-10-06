@@ -182,12 +182,12 @@ Item {
         const term = c > 0 ? q.substring(c + 1) : q;
         const hit = r => r.name.toLowerCase().includes(q) || (c > 0 && MiseService.backendOf(r.name) === q.substring(0, c) && r.name.toLowerCase().includes(term));
         return installedRows.filter(hit).concat(MiseService.search(query, target).filter(r => !r.installed).map(r => ({
-                        name: r.name,
-                        scope: target,
-                        installed: false,
-                        direct: r.direct,
-                        sub: r.backend + (scope === "*" && MiseService.scopes.length ? " · installs globally" : "")
-                    })));
+                    name: r.name,
+                    scope: target,
+                    installed: false,
+                    direct: r.direct,
+                    sub: r.backend + (scope === "*" && MiseService.scopes.length ? " · installs globally" : "")
+                })));
     }
     readonly property int shown: tab === 0 ? updList.length : toolList.length
 
