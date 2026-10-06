@@ -15,6 +15,7 @@ PluginComponent {
     id: root
 
     readonly property bool windowMode: root.pluginData?.panelMode === "window"
+    readonly property string startTab: root.pluginData?.panelTab ?? "auto"
     readonly property real panelW: Math.round(Theme.fontSizeMedium * 34)
     readonly property real panelH: Math.round(Theme.fontSizeMedium * 46)
     readonly property bool shown: windowMode ? win.visible : modal.shouldBeVisible
@@ -61,10 +62,11 @@ PluginComponent {
         }
     }
 
-    // header (drag area, maximize, close) + the shared Tools panel
+    // header (drag area, maximize, close) + the shared Updates / Tools panel
     component Body: FocusScope {
         id: body
 
+        property string startTab: "auto"
         property bool canMaximize: false
         property bool maximized: false
         property alias panel: panel
@@ -77,7 +79,10 @@ PluginComponent {
 
         focus: true
         Keys.onEscapePressed: body.closeRequested()
-        Component.onCompleted: Qt.callLater(panel.focusSearch)
+        Component.onCompleted: {
+            panel.pickInitialTab(body.startTab);
+            Qt.callLater(panel.focusSearch);
+        }
 
         Item {
             id: header
@@ -149,7 +154,6 @@ PluginComponent {
 
         MisePanel {
             id: panel
-            toolsOnly: true
             x: Theme.spacingL
             y: header.y + header.height + Theme.spacingM
             width: parent.width - Theme.spacingL * 2
@@ -168,12 +172,15 @@ PluginComponent {
         visible: false
 
         onClosed: win.visible = false
-        onVisibleChanged: if (visible)
-            Qt.callLater(winBody.panel.focusSearch)
+        onVisibleChanged: if (visible) {
+            winBody.panel.pickInitialTab(winBody.startTab);
+            Qt.callLater(winBody.panel.focusSearch);
+        }
 
         Body {
             id: winBody
             anchors.fill: parent
+            startTab: root.startTab
             canMaximize: wc.canMaximize
             maximized: win.maximized
             onHeaderPressed: wc.tryStartMove()
@@ -211,6 +218,7 @@ PluginComponent {
         Body {
             width: modal.modalWidth
             height: modal.modalHeight
+            startTab: root.startTab
 
             property var grab: Qt.point(0, 0)
             property var start: Qt.point(0, 0)

@@ -49,6 +49,18 @@ PluginSettings {
         defaultValue: "modal"
     }
 
+    SelectionSetting {
+        settingKey: "panelTab"
+        label: "Keybind panel opens on"
+        description: "Auto: Updates if something is pending (updates or bumps), Tools otherwise."
+        options: [
+            {label: "Auto", value: "auto"},
+            {label: "Updates", value: "updates"},
+            {label: "Tools", value: "tools"}
+        ]
+        defaultValue: "auto"
+    }
+
     ToggleSetting {
         settingKey: "showBumps"
         label: "Show pinned / major updates"
