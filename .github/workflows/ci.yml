@@ -82,6 +82,24 @@ jobs:
           done
           exit $missing
 
+  qml-format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # v31.11.1
+      # yamllint disable-line rule:line-length
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24
+
+      # Same pinned Qt as qml-lint: every Qt version formats a bit differently.
+      # Fix locally with the same command plus -i, see AGENTS.md.
+      - name: qmlformat
+        env:
+          NIXPKGS: github:NixOS/nixpkgs/aa48d347080940b8a2b8d2f48228674e280a3514
+        run: |
+          nix shell "$NIXPKGS#qt6.qtdeclarative" -c qmlformat -i *.qml
+          git diff --exit-code
+
   qml-lint:
     runs-on: ubuntu-latest
     steps:
