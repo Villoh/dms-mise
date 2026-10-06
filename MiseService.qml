@@ -13,6 +13,8 @@ Item {
     readonly property var outdated: outdatedRaw.concat(projectOutdated).filter(t => !isIgnored(t.name, t.latest))
     property var installed: []   // ["node", "pipx:harlequin", ...]
     property var versions: ({})  // name -> active version
+    property var prunable: ({})  // name -> [versions] no tracked config uses (`mise ls --prunable`)
+    readonly property int prunableCount: Object.keys(prunable).reduce((n, k) => n + prunable[k].length, 0)
     property var registry: []    // [{name, backend}] ~1000 curated entries
     property bool remoteSearch: true  // query npm / crates.io / GitHub as you type (Settings)
     property string lookupQ: ""       // last query handed to lookup()
@@ -256,13 +258,18 @@ Item {
     // folder or file -> absolute config file path; error text on stderr
     readonly property string resolveScript: 'p=$1\n' + 'case "$p" in "~"|"~/"*) p="$HOME${p#"~"}";; esac\n' + 'g="${MISE_GLOBAL_CONFIG_FILE:-$HOME/.config/mise/config.toml}"\n' + 'ok() { r=$(readlink -f "$1"); [ "$r" = "$(readlink -f "$g")" ] && { echo "That is the global config" >&2; exit 1; }; echo "$r"; exit 0; }\n' + '[ -f "$p" ] && ok "$p"\n' + '[ -d "$p" ] || { echo "Not found: $1" >&2; exit 1; }\n' + 'for c in mise.toml .mise.toml mise/config.toml .mise/config.toml .config/mise.toml .config/mise/config.toml; do [ -f "$p/$c" ] && ok "$p/$c"; done\n' + 'echo "No mise config in $1" >&2; exit 1'
 
+    // mise has no `pypi:` backend, its name is `pipx:`: search, lookup and installs all use that
+    function alias(q) {
+        return q.replace(/^\s*pypi:/i, "pipx:");
+    }
+
     // Search registry + accept any `backend:tool` (pipx:, npm:, cargo:, github:, ...)
     // since the registry is only a curated subset of what mise can install.
     // `scope`: where it would be installed ("" / omitted = global); decides what counts as installed
     function search(query, scope) {
         const sc = scope || "";
         const toolsHere = toolsIn(sc);
-        const raw = (query || "").trim();   // keep case: github:Owner/Repo, [opts] are case-sensitive
+        const raw = alias((query || "").trim());   // keep case: github:Owner/Repo, [opts] are case-sensitive
         const q = raw.toLowerCase();
         if (!q)
             return [];
@@ -417,7 +424,7 @@ Item {
 
     // Call from the UI whenever the query changes; debounced, one request per backend at a time.
     function lookup(raw) {
-        const q = (raw || "").trim();
+        const q = alias((raw || "").trim());
         if (q === lookupQ)
             return;
         lookupQ = q;
@@ -638,6 +645,8 @@ Item {
         }
         if (!lsProc.running)
             lsProc.running = true;
+        if (!pruneProc.running)
+            pruneProc.running = true;
         if (!bumpProc.running)
             bumpProc.running = true;
         refreshProjects();
@@ -713,6 +722,121 @@ Item {
     // removes from that config and prunes the installed version
     function uninstall(tool, scope) {
         run(scope ? ["unuse", "--path", scope, "--yes", tool] : ["unuse", "--global", "--yes", tool], "Removing " + tool + inLabel(scope), "Removed " + tool + inLabel(scope));
+    }
+
+    // ---- tool info (row expander): `mise tool --json` + the last versions from `mise ls-remote` ----
+    // name -> {meta, versions, metaError, versionsError}; undefined = not asked, null = in flight
+    property var info: ({})
+    readonly property int maxVersions: 20
+
+    // `npm:foo@1.2` / `foo[opt=x]` -> `npm:foo`
+    function bareName(n) {
+        return n.replace(/\[.*\]$/, "").replace(/@[^/@:]*$/, "");
+    }
+
+    function setInfo(n, patch) {
+        const m = Object.assign({}, info);
+        m[n] = Object.assign({}, m[n] || {}, patch);
+        info = m;
+    }
+
+    // cached after the first answer; a failed one is retried the next time the row opens
+    function loadInfo(name) {
+        const n = bareName(name);
+        const i = info[n] || {};
+        if (i.meta === undefined) {
+            setInfo(n, {
+                meta: null,
+                metaError: ""
+            });
+            metaAsk.ask(n);
+        }
+        if (i.versions === undefined) {
+            setInfo(n, {
+                versions: null,
+                versionsError: ""
+            });
+            versionsAsk.ask(n);
+        }
+    }
+
+    // after a job the installed / active versions changed: re-ask the cached tools (old values stay
+    // on screen meanwhile; the version lists don't change)
+    function refreshInfo() {
+        Object.keys(info).filter(n => info[n].meta).forEach(n => metaAsk.ask(n));
+    }
+
+    // one mise call at a time, the rest wait their turn. The tool name is echoed as the first output line
+    // so an answer can't be matched to the wrong tool.
+    component Ask: Process {
+        id: a
+        property var args: t => []
+        property var queue: []
+        signal answer(string tool, string body)
+        function ask(t) {
+            if (running) {
+                queue = queue.concat([t]);
+                return;
+            }
+            command = ["sh", "-c", 'echo "$1"; shift; exec timeout 30 mise "$@"', "sh", t].concat(args(t));
+            running = true;
+        }
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const i = text.indexOf("\n");
+                a.answer(text.substring(0, i), text.substring(i + 1));
+            }
+        }
+        onExited: {
+            if (!queue.length)
+                return;
+            const t = queue[0];
+            queue = queue.slice(1);
+            ask(t);
+        }
+    }
+
+    Ask {
+        id: metaAsk
+        args: t => ["tool", "--json", t]
+        onAnswer: (tool, body) => {
+            try {
+                root.setInfo(tool, {
+                    meta: JSON.parse(body)
+                });
+            } catch (e) {
+                root.setInfo(tool, {
+                    meta: undefined,
+                    metaError: "Could not read `mise tool " + tool + "`"
+                });
+            }
+        }
+    }
+
+    Ask {
+        id: versionsAsk
+        args: t => ["ls-remote", t]
+        // oldest first -> newest first
+        onAnswer: (tool, body) => {
+            const v = body.split("\n").map(x => x.trim()).filter(x => x).slice(-root.maxVersions).reverse();
+            root.setInfo(tool, v.length ? {
+                versions: v
+            } : {
+                versions: undefined,
+                versionsError: "No versions found (offline, or the tool doesn't exist)"
+            });
+        }
+    }
+
+    // removes that one installed version; the config is not touched
+    function uninstallVersion(tool, version) {
+        run(["uninstall", "--yes", tool + "@" + version], "Removing " + tool + "@" + version, "Removed " + tool + "@" + version);
+    }
+
+    // unused versions of one tool, or of every tool when omitted. Not scoped: `mise prune` goes by all
+    // the configs mise has tracked.
+    function prune(tool) {
+        run(["prune", "--tools", "--yes"].concat(tool ? [tool] : []), tool ? "Pruning " + tool : "Pruning unused versions", tool ? "Pruned " + tool : "Pruned unused versions");
     }
 
     function pushLog(line) {
@@ -795,6 +919,21 @@ Item {
                     const v = {};
                     root.installed.forEach(k => v[k] = (d[k].find(x => x.active) || d[k][0] || {}).version || "");
                     root.versions = v;
+                } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: pruneProc
+        command: ["mise", "ls", "--prunable", "--json"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const d = JSON.parse(text);
+                    const p = {};
+                    Object.keys(d).forEach(k => p[k] = d[k].map(x => x.version));
+                    root.prunable = p;
                 } catch (e) {}
             }
         }
@@ -897,6 +1036,7 @@ Item {
             else
                 ToastService.showError("mise failed", root.failureSummary());
             root.refresh();
+            root.refreshInfo();
         }
     }
 }

@@ -99,12 +99,18 @@ They are written to the config as an inline table and kept on updates. Text is p
 
 Pin a version with `@`: `ripgrep@14.0.3` or `pipx:package@1.2`. The version part is *not* a prefix filter, it is what `mise use` writes, so `@14.0.3` pins exactly and `@14` follows the latest 14.x. (The separator is `@`, not `:`.) Entries with a version or options always show as installable, even if the tool is already installed, so you can re-pin or reconfigure it.
 
+### Details and versions
+
+The info button on a Tools row expands it in place (one row at a time): description, backend, installed versions, and the latest 20 versions from the backend. The active version has a highlighted border, installed ones a ✓. Click a version to pin it (`mise use <tool>@<version>`, in the same scope as Install), which also lets you go back to an older release. Answers are cached until the panel is reloaded; a failed lookup is retried when you reopen the row.
+
+Installed versions other than the active one carry a trash icon: click it, then click again to remove just that version (`mise uninstall tool@version`, the config is not touched). Installed versions too old to be in the latest 20 are listed as well. When a tool has versions that no tracked config uses, a *Prune N unused* button removes them. The Tools tab also gets a *Prune unused versions* button at the bottom for all tools. Pruning follows every config mise has tracked, not only the scope you picked.
+
 ### Live search and verification
 
 Beyond the registry, typing in Tools (or the launcher) also queries the package sites, debounced (350 ms, 3+ characters):
 
 - **free text**: registry (12) plus npm and crates.io (5 each), shown as `npm:name` / `cargo:name` with the description
-- **`backend:q`**: that backend only, up to 15 hits. Searchable: `npm`, `cargo`, `github` (no `/`), `gem`, `dotnet`, `pipx`/`pypi` and `go` (see below), `conda` (conda-forge only: anaconda.org searches every channel and takes 1-3 s). Other backends are not searched freely so plain text does not drown in results (GitHub also allows only 10 searches a minute unauthenticated)
+- **`backend:q`**: that backend only, up to 15 hits. Searchable: `npm`, `cargo`, `github` (no `/`), `gem`, `dotnet`, `pipx` (`pypi:` is read as `pipx:`, mise has no `pypi` backend) and `go` (see below), `conda` (conda-forge only: anaconda.org searches every channel and takes 1-3 s). Other backends are not searched freely so plain text does not drown in results (GitHub also allows only 10 searches a minute unauthenticated)
 - a typed `backend:tool` is checked against the site: `✓ description` or `✗ not found`. Verified: `npm`, `cargo`, `pipx`/`pypi`, `gem`, `conda` (conda-forge), `dotnet`, `go` (module path), `aqua`, `github`, `ubi`, `spm`, `gitlab` (`owner/repo`). A hint only, Enter still installs (private registries). When a search hit is the same package as what you typed (any capitalization; `-`/`_` for cargo), the two are one row, with the hit's canonical name and description. Entries with `@version` or `[options]` always stay as typed
 
 No search for `aqua`, `gitlab` (search is unranked noise), `ubi`, `spm`, `http`, `s3`, `asdf`, `vfox`: exact name only, or use the registry. GitHub `owner/repo` checks use the unauthenticated API (60/hour); a rate-limited answer just shows no ✓/✗. PyPI and Go have no search API (PyPI's was disabled in 2021 and `pypi.org/search` sits behind a JavaScript challenge), so `pipx:q`, `pypi:q` and `go:q` use the search behind [deps.dev](https://deps.dev)'s own website (Google's Open Source Insights): a plain JSON endpoint, ranked by relevance, no key. It is **unofficial and undocumented**, so it may change or disappear without notice; if it fails there are simply no hits for those backends and the exact-name check still works. Rows show the latest version, not a description. Turn all of this off in Settings (*Live search and verification*): only the registry is used and nothing you type leaves your machine.
@@ -123,6 +129,9 @@ Settings → Plugins → mise: check interval (15 min, 30 min, 1 h, 4 h, daily).
 | Update | `mise upgrade --yes [tool]` (`mise -C <project> upgrade ...` for a project) |
 | Bump | `mise upgrade --bump --yes <tool>` (same `-C`) |
 | Install | `mise use --global --yes <tool>`, or `mise use --path <config> --yes <tool>` for a project |
+| Details | `mise tool --json <tool>`, `mise ls-remote <tool>` (30 s timeout, only when a row is expanded) |
+| Remove a version | `mise uninstall --yes <tool>@<version>` |
+| Prune | `mise ls --prunable --json` (with every check), `mise prune --tools --yes [tool]` |
 | Remove | `mise unuse --global --yes <tool>`, or `mise unuse --path <config> --yes <tool>` for a project |
 
 One job at a time.
