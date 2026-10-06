@@ -146,7 +146,11 @@ Item {
         const q = query.trim().toLowerCase();
         if (!q)
             return installedRows.filter(r => !backend || MiseService.backendOf(r.name) === backend);
-        return installedRows.filter(r => r.name.toLowerCase().includes(q)).concat(MiseService.search(query, target).filter(r => !r.installed).map(r => ({
+        // `npm:google` matches `npm:@ai-sdk/google` too: the same backend:term split the search uses
+        const c = q.indexOf(":");
+        const term = c > 0 ? q.substring(c + 1) : q;
+        const hit = r => r.name.toLowerCase().includes(q) || (c > 0 && MiseService.backendOf(r.name) === q.substring(0, c) && r.name.toLowerCase().includes(term));
+        return installedRows.filter(hit).concat(MiseService.search(query, target).filter(r => !r.installed).map(r => ({
                         name: r.name,
                         scope: target,
                         installed: false,
