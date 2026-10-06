@@ -97,6 +97,16 @@ npm:package[allow_builds=["node-pty"]]
 
 They are written to the config as an inline table and kept on updates. Text is passed unchanged, so it is case-sensitive.
 
+Tools that need several options, like the `http` backend, have a form: type `http:` and click the *custom download URL* row. Fill in the name, the download URL (with `{{version}}` in it) and a version list URL. If that list is JSON, add the path of the version in it (`.version`, `.[].tag_name`); if it is HTML or text, a regex with one capture group. Tick *List is not oldest first* for GitHub releases (and anything newest first): mise takes the last entry as `latest`, so without it you get the oldest release (`version_order=semver`). *Advanced* has `strip_components`, `bin_path`, `rename_exe`, `format` and `checksum_url` (read by `mise lock`, not by install; a fixed `checksum` is left out because it breaks on the next release).
+
+You can also paste a `[tools."http:name"]` block (or a `"http:name" = { … }` line) from a mise.toml into the first field and it fills all of this. Under the fields you see the exact line `mise use` will get and, once you stop typing, what `latest` resolves to (`✓ latest resolves to 2.102.0` / `✗ No versions found`; a hint only, the button stays enabled). *Install latest* runs it:
+
+```text
+http:devin[url=https://static.devin.ai/cli/{{version}}/devin-{{version}}-x86_64-unknown-linux.tar.gz,version_list_url=https://static.devin.ai/cli/current/manifest.json,version_json_path=.version]@latest
+```
+
+The version list is what lets `latest` resolve and shows up in the version chips. No `checksum` is needed (it is a fixed value, so it would break on the next release).
+
 Pin a version with `@`: `ripgrep@14.0.3` or `pipx:package@1.2`. The version part is *not* a prefix filter, it is what `mise use` writes, so `@14.0.3` pins exactly and `@14` follows the latest 14.x. (The separator is `@`, not `:`.) Entries with a version or options always show as installable, even if the tool is already installed, so you can re-pin or reconfigure it.
 
 ### Details and versions
