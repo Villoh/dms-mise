@@ -1,7 +1,6 @@
 import QtQuick
 import qs.Common
 import qs.Widgets
-import QtQuick.Effects
 import qs.Modules.Plugins
 
 PluginComponent {
@@ -17,7 +16,7 @@ PluginComponent {
     // primary = updates, warning (orange) = only bumps pending
     readonly property color pillColor: MiseService.error ? Theme.error : (count > 0 ? Theme.primary : (bumpCount > 0 ? Theme.warning : Theme.surfaceVariantText))
 
-    // mise logo (assets/mise.svg, black line art) recoloured to a theme colour.
+    // chef hat from the Material Symbols font DMS ships, so it renders like the other bar icons.
     // Inline: a new type in qmldir is not picked up by `plugins reload`.
     component MiseIcon: Item {
         id: ic
@@ -29,27 +28,11 @@ PluginComponent {
         implicitWidth: size
         implicitHeight: size
 
-        // Qt5Compat is not installed with DMS: tint via a colour rect masked by the logo.
-        Image {
-            id: logo
-            anchors.fill: parent
-            source: Qt.resolvedUrl("assets/mise.svg")
-            sourceSize.width: ic.size * 2
-            sourceSize.height: ic.size * 2
-            fillMode: Image.PreserveAspectFit
-            smooth: true
-            visible: false
-            layer.enabled: true
-        }
-
-        Rectangle {
-            anchors.fill: parent
+        DankIcon {
+            anchors.centerIn: parent
+            name: "chef_hat"
+            size: ic.size
             color: ic.color
-            layer.enabled: true
-            layer.effect: MultiEffect {
-                maskEnabled: true
-                maskSource: logo
-            }
         }
 
         SequentialAnimation on opacity {
@@ -75,7 +58,7 @@ PluginComponent {
         Row {
             spacing: Theme.spacingXS
             MiseIcon {
-                size: root.iconSize + 2
+                size: root.iconSize
                 color: root.pillColor
                 pulse: root.working
                 anchors.verticalCenter: parent.verticalCenter
@@ -111,7 +94,7 @@ PluginComponent {
         Column {
             spacing: Theme.spacingXS
             MiseIcon {
-                size: root.iconSize + 2
+                size: root.iconSize
                 color: root.pillColor
                 pulse: root.working
                 anchors.horizontalCenter: parent.horizontalCenter

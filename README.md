@@ -10,7 +10,7 @@ Composite plugin: a **DankBar widget**, a **keybind panel** (same UI, no bar nee
 
 ## Widget
 
-Pill with the mise logo. Two counters appear next to it: updates (primary colour) and bumps (orange, with an up arrow). The logo is primary when updates are pending, orange when only bumps are; it turns red if the check fails and blinks while mise is working.
+Pill with a chef hat icon. Two counters appear next to it: updates (primary colour) and bumps (orange, with an up arrow). The icon is primary when updates are pending, orange when only bumps are; it turns red if the check fails and blinks while mise is working.
 
 Click it for the popout:
 
@@ -126,9 +126,9 @@ ln -s "$PWD" ~/.config/DankMaterialShell/plugins/mise
 dms ipc call plugins reload mise
 ```
 
-`reload` is enough for `MiseBar.qml` / `MiseLauncher.qml` / `MiseDaemon.qml` edits. `MiseService.qml` is a singleton and `MisePanel.qml` is registered, both through `qmldir`, and `plugin.json` is read at scan time: for those, run `dms restart`. `Qt5Compat` is not available in every DMS install, so the logo is tinted with `QtQuick.Effects` (`MultiEffect` mask) instead.
+`reload` is enough for `MiseBar.qml` / `MiseLauncher.qml` / `MiseDaemon.qml` edits. `MiseService.qml` is a singleton and `MisePanel.qml` is registered, both through `qmldir`, and `plugin.json` is read at scan time: for those, run `dms restart`.
 
-Logo: `assets/mise.svg`, from <https://mise.jdx.dev/logo.svg>.
+Logo: `assets/mise.svg`, from <https://mise.jdx.dev/logo.svg>. The bar pill uses the `chef_hat` icon from Material Symbols instead: the logo line art is too fine to read at bar size.
 
 ## License
 
