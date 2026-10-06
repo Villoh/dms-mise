@@ -96,6 +96,7 @@ PluginComponent {
                 anchors.left: parent.left
                 anchors.right: buttons.left
                 height: parent.height
+                cursorShape: Qt.SizeAllCursor
                 onPressed: m => body.headerPressed(grip.mapToItem(null, m.x, m.y))
                 onPositionChanged: m => {
                     if (pressed)
