@@ -35,6 +35,7 @@ Item {
     property string updFilter: ""
     property string query: ""
     property string backend: ""     // backend chip filter ("" = all)
+    property string openRow: ""    // tools tab: the one expanded row (name|scope)
     // scope picker (Settings > Project tools): "" = global (default), "*" = everything, else a project's config path
     property string scope: ""
     property bool menuOpen: false   // scope menu (toolbar button)
@@ -654,10 +655,14 @@ Item {
                 id: row
                 required property var modelData
                 property bool confirm: false   // remove is two-step
+                readonly property string key: modelData.name + "|" + modelData.scope
+                readonly property bool open: pop.openRow === key
+                readonly property var info: MiseService.info[MiseService.bareName(modelData.name)] || ({})
                 width: ListView.view ? ListView.view.width : 0
-                height: pop.rowH
+                height: open ? pop.rowH + details.implicitHeight + Theme.spacingS : pop.rowH
+                clip: true
                 radius: Theme.cornerRadius
-                color: rowHover.containsMouse ? Theme.primaryHoverLight : "transparent"
+                color: open ? Theme.surfaceContainerHigh : rowHover.containsMouse ? Theme.primaryHoverLight : "transparent"
                 MouseArea {
                     id: rowHover
                     anchors.fill: parent
@@ -668,11 +673,16 @@ Item {
                     interval: 3000
                     onTriggered: row.confirm = false
                 }
+                Item {
+                    id: head
+                    width: parent.width
+                    height: pop.rowH
+                }
                 DankIcon {
                     id: rowIcon
                     anchors.left: parent.left
                     anchors.leftMargin: Theme.spacingM
-                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenter: head.verticalCenter
                     name: modelData.installed ? "check_circle" : (modelData.direct ? "add_circle" : "download")
                     size: Theme.iconSize - 4
                     color: modelData.installed ? Theme.surfaceVariantText : Theme.primary
@@ -680,9 +690,9 @@ Item {
                 Column {
                     anchors.left: rowIcon.right
                     anchors.leftMargin: Theme.spacingM
-                    anchors.right: rowBtn.left
+                    anchors.right: infoBtn.left
                     anchors.rightMargin: Theme.spacingS
-                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenter: head.verticalCenter
                     spacing: 1
                     StyledText {
                         width: parent.width
@@ -696,7 +706,8 @@ Item {
                     }
                     StyledText {
                         width: parent.width
-                        visible: text !== ""
+                        // not installed: the details repeat it in full
+                        visible: text !== "" && !(row.open && !modelData.installed)
                         text: modelData.sub
                         font.pixelSize: Theme.fontSizeSmall
                         font.family: Theme.monoFontFamily
@@ -707,10 +718,24 @@ Item {
                     }
                 }
                 DankActionButton {
+                    id: infoBtn
+                    anchors.right: rowBtn.left
+                    anchors.verticalCenter: head.verticalCenter
+                    buttonSize: pop.iconBtn
+                    iconName: row.open ? "expand_less" : "info"
+                    iconColor: Theme.surfaceVariantText
+                    tooltipText: "Details & versions"
+                    onClicked: {
+                        pop.openRow = row.open ? "" : row.key;
+                        if (row.open)
+                            MiseService.loadInfo(modelData.name);
+                    }
+                }
+                DankActionButton {
                     id: rowBtn
                     anchors.right: parent.right
                     anchors.rightMargin: Theme.spacingS
-                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenter: head.verticalCenter
                     buttonSize: pop.iconBtn
                     // installed: red bin, first click arms (red check), second removes
                     // not installed: download = install
@@ -727,6 +752,89 @@ Item {
                             confirmReset.restart();
                         } else {
                             MiseService.uninstall(modelData.name, modelData.scope);
+                        }
+                    }
+                }
+
+                // expanded: description, backend, installed versions, and the latest versions to pin
+                Column {
+                    id: details
+                    visible: row.open
+                    anchors.top: head.bottom
+                    anchors.left: rowIcon.right
+                    anchors.right: parent.right
+                    anchors.leftMargin: Theme.spacingM
+                    anchors.rightMargin: Theme.spacingM
+                    spacing: Theme.spacingXS
+
+                    StyledText {
+                        width: parent.width
+                        visible: text !== ""
+                        text: row.info.meta && row.info.meta.description ? row.info.meta.description : (modelData.installed ? "" : modelData.sub)
+                        wrapMode: Text.Wrap
+                        font.pixelSize: Theme.fontSizeSmall
+                        color: Theme.surfaceText
+                    }
+                    StyledText {
+                        width: parent.width
+                        text: row.info.meta ? "Backend: " + row.info.meta.backend + "\nInstalled: " + ((row.info.meta.installed_versions || []).join(", ") || "none") : (row.info.metaError || "Loading…")
+                        wrapMode: Text.Wrap
+                        font.pixelSize: Theme.fontSizeSmall
+                        font.family: Theme.monoFontFamily
+                        color: Theme.surfaceVariantText
+                    }
+                    StyledText {
+                        width: parent.width
+                        visible: !row.info.versions
+                        text: row.info.versionsError || "Loading versions…"
+                        font.pixelSize: Theme.fontSizeSmall
+                        color: Theme.surfaceVariantText
+                    }
+                    Flow {
+                        width: parent.width
+                        spacing: Theme.spacingXS
+                        visible: !!row.info.versions
+
+                        Repeater {
+                            model: row.info.versions || []
+                            delegate: Rectangle {
+                                id: chip
+                                required property string modelData
+                                readonly property bool have: ((row.info.meta || {}).installed_versions || []).includes(modelData)
+                                readonly property bool active: ((row.info.meta || {}).active_versions || []).includes(modelData)
+                                width: chipRow.implicitWidth + Theme.spacingM * 2
+                                height: pop.chipH
+                                radius: Theme.cornerRadius
+                                color: chipArea.containsMouse && !MiseService.busy ? Theme.primaryHoverLight : chip.active ? Theme.withAlpha(Theme.primary, 0.2) : "transparent"
+                                border.width: chip.active ? 2 : 1
+                                border.color: chip.active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.4)
+                                opacity: MiseService.busy ? 0.5 : 1
+                                Row {
+                                    id: chipRow
+                                    anchors.centerIn: parent
+                                    spacing: Theme.spacingXXS
+                                    DankIcon {
+                                        visible: chip.have
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        name: "check"
+                                        size: Theme.fontSizeSmall
+                                        color: chip.active ? Theme.primary : Theme.surfaceVariantText
+                                    }
+                                    StyledText {
+                                        text: chip.modelData
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        font.family: Theme.monoFontFamily
+                                        color: chip.have ? Theme.surfaceVariantText : Theme.primary
+                                    }
+                                }
+                                MouseArea {
+                                    id: chipArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    enabled: !MiseService.busy
+                                    onClicked: MiseService.install(MiseService.bareName(row.modelData.name) + "@" + chip.modelData, row.modelData.scope)
+                                }
+                            }
                         }
                     }
                 }

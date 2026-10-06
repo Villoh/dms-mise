@@ -99,6 +99,10 @@ They are written to the config as an inline table and kept on updates. Text is p
 
 Pin a version with `@`: `ripgrep@14.0.3` or `pipx:package@1.2`. The version part is *not* a prefix filter, it is what `mise use` writes, so `@14.0.3` pins exactly and `@14` follows the latest 14.x. (The separator is `@`, not `:`.) Entries with a version or options always show as installable, even if the tool is already installed, so you can re-pin or reconfigure it.
 
+### Details and versions
+
+The info button on a Tools row expands it in place (one row at a time): description, backend, installed versions, and the latest 20 versions from the backend. The active version has a highlighted border, installed ones a ✓. Click a version to pin it (`mise use <tool>@<version>`, in the same scope as Install), which also lets you go back to an older release. Answers are cached until the panel is reloaded; a failed lookup is retried when you reopen the row.
+
 ### Live search and verification
 
 Beyond the registry, typing in Tools (or the launcher) also queries the package sites, debounced (350 ms, 3+ characters):
@@ -123,6 +127,7 @@ Settings → Plugins → mise: check interval (15 min, 30 min, 1 h, 4 h, daily).
 | Update | `mise upgrade --yes [tool]` (`mise -C <project> upgrade ...` for a project) |
 | Bump | `mise upgrade --bump --yes <tool>` (same `-C`) |
 | Install | `mise use --global --yes <tool>`, or `mise use --path <config> --yes <tool>` for a project |
+| Details | `mise tool --json <tool>`, `mise ls-remote <tool>` (30 s timeout, only when a row is expanded) |
 | Remove | `mise unuse --global --yes <tool>`, or `mise unuse --path <config> --yes <tool>` for a project |
 
 One job at a time.
