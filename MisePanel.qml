@@ -143,7 +143,7 @@ Item {
     readonly property var updList: (ignoredView ? ignoredRows : updRows).filter(t => t.name.toLowerCase().includes(updFilter.trim().toLowerCase()) && (!backend || ignoredView || MiseService.backendOf(t.name) === backend) && (ignoredView || inScope(t)))
     // tools tab: no query -> what you have installed; query -> installed matches, then registry hits
     readonly property var toolList: {
-        const q = query.trim().toLowerCase();
+        const q = MiseService.alias(query).trim().toLowerCase();
         if (!q)
             return installedRows.filter(r => !backend || MiseService.backendOf(r.name) === backend);
         // `npm:google` matches `npm:@ai-sdk/google` too: the same backend:term split the search uses

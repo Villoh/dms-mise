@@ -256,13 +256,18 @@ Item {
     // folder or file -> absolute config file path; error text on stderr
     readonly property string resolveScript: 'p=$1\n' + 'case "$p" in "~"|"~/"*) p="$HOME${p#"~"}";; esac\n' + 'g="${MISE_GLOBAL_CONFIG_FILE:-$HOME/.config/mise/config.toml}"\n' + 'ok() { r=$(readlink -f "$1"); [ "$r" = "$(readlink -f "$g")" ] && { echo "That is the global config" >&2; exit 1; }; echo "$r"; exit 0; }\n' + '[ -f "$p" ] && ok "$p"\n' + '[ -d "$p" ] || { echo "Not found: $1" >&2; exit 1; }\n' + 'for c in mise.toml .mise.toml mise/config.toml .mise/config.toml .config/mise.toml .config/mise/config.toml; do [ -f "$p/$c" ] && ok "$p/$c"; done\n' + 'echo "No mise config in $1" >&2; exit 1'
 
+    // mise has no `pypi:` backend, its name is `pipx:`: search, lookup and installs all use that
+    function alias(q) {
+        return q.replace(/^\s*pypi:/i, "pipx:");
+    }
+
     // Search registry + accept any `backend:tool` (pipx:, npm:, cargo:, github:, ...)
     // since the registry is only a curated subset of what mise can install.
     // `scope`: where it would be installed ("" / omitted = global); decides what counts as installed
     function search(query, scope) {
         const sc = scope || "";
         const toolsHere = toolsIn(sc);
-        const raw = (query || "").trim();   // keep case: github:Owner/Repo, [opts] are case-sensitive
+        const raw = alias((query || "").trim());   // keep case: github:Owner/Repo, [opts] are case-sensitive
         const q = raw.toLowerCase();
         if (!q)
             return [];
@@ -417,7 +422,7 @@ Item {
 
     // Call from the UI whenever the query changes; debounced, one request per backend at a time.
     function lookup(raw) {
-        const q = (raw || "").trim();
+        const q = alias((raw || "").trim());
         if (q === lookupQ)
             return;
         lookupQ = q;
