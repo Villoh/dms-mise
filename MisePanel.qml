@@ -1,13 +1,16 @@
 import QtQuick
 import qs.Common
 import qs.Widgets
+import qs.Services
+import qs.Modals.FileBrowser
 
 // Updates / Tools UI shared by the bar popout (MiseBar.qml) and the keybind modal (MiseDaemon.qml).
 Item {
     id: pop
 
-    readonly property int count: MiseService.outdated.length
-    readonly property int bumpCount: MiseService.bumps.length
+    // header, tab and first-tab choice follow the picked scope (the bar badge has its own setting)
+    readonly property int count: scopedCount
+    readonly property int bumpCount: scopedBumps
 
     // sizes derived from theme tokens, so they follow the user's font / icon scaling
     readonly property real controlH: Theme.iconSize + Theme.spacingL
@@ -16,7 +19,7 @@ Item {
     readonly property real iconBtn: Theme.iconSize + Theme.spacingM
     readonly property real actionIcon: Theme.iconSize - Theme.spacingXS
 
-    readonly property string summary: MiseService.error || ((count > 0 ? count + " outdated" : "All up to date") + (bumpCount ? " · " + bumpCount + " bumpable" : "") + " · " + MiseService.installed.length + " installed" + checkedText)
+    readonly property string summary: MiseService.error || ((count > 0 ? count + " outdated" : (MiseService.scopes.length ? scopeName + " is up to date" : "All up to date")) + (bumpCount ? " · " + bumpCount + " bumpable" : "") + " · " + installedRows.length + " installed" + checkedText)
 
     // on open. "updates" / "tools" are fixed; anything else is auto:
     // Updates if something is pending (updates or bumps), Tools otherwise
@@ -32,6 +35,42 @@ Item {
     property string updFilter: ""
     property string query: ""
     property string backend: ""     // backend chip filter ("" = all)
+    // scope picker (Settings > Project tools): "" = global (default), "*" = everything, else a project's config path
+    property string scope: ""
+    property bool menuOpen: false   // scope menu (toolbar button)
+    property bool adding: false     // "type a path" field shown inside that menu
+    property bool addPending: false // an add (typed or picked) is in flight: select the project when it lands
+    function closeMenu() {
+        menuOpen = false;
+        adding = false;
+        addErr.text = "";
+    }
+    // where Install writes: the picked scope, global when looking at everything
+    readonly property string target: scope === "*" ? "" : scope
+    readonly property bool showScope: scope === "*" && MiseService.scopes.length > 0
+    readonly property var scopeOptions: [{
+            key: "",
+            label: "Global"
+        }, {
+            key: "*",
+            label: "All"
+        }].concat(MiseService.scopes.map(s => ({
+                    key: s,
+                    label: MiseService.scopeLabel(s)
+                })))
+    readonly property string scopeName: scope === "*" ? "All" : scope === "" ? "Global" : MiseService.scopeLabel(scope)
+    function inScope(r) {
+        return scope === "*" || r.scope === scope;
+    }
+    // pending updates / bumps of one scope ("*" = all of them), for the menu and the hints below
+    function pendingIn(key) {
+        return updRows.filter(r => key === "*" || r.scope === key).length;
+    }
+    // pending in scopes other than the one being looked at
+    readonly property int elsewhere: scope === "*" ? 0 : updRows.length - pendingIn(scope)
+    readonly property int elsewhereBumps: scope === "*" ? 0 : updRows.filter(r => r.bump && !inScope(r)).length
+    // "1 update", "2 bumps" or "1 update · 1 bump": a bump is not an update (it rewrites the config)
+    readonly property string elsewhereText: [elsewhere - elsewhereBumps > 0 ? (elsewhere - elsewhereBumps) + (elsewhere - elsewhereBumps === 1 ? " update" : " updates") : "", elsewhereBumps > 0 ? elsewhereBumps + (elsewhereBumps === 1 ? " bump" : " bumps") : ""].filter(x => x).join(" · ") + (scope === "" ? " in projects" : " in other scopes")
     readonly property string checkedText: {
         if (!MiseService.lastCheck)
             return "";
@@ -48,14 +87,19 @@ Item {
                 requested: t.requested,
                 current: t.current,
                 latest: t.latest,
+                scope: t.scope,
                 bump: false
             })).concat(MiseService.bumps.map(t => ({
                     name: t.name,
                     requested: t.requested,
                     current: t.current,
                     latest: t.bump,
+                    scope: t.scope,
                     bump: true
                 })))
+    // what the Update all / Bump all buttons act on: the picked scope
+    readonly property int scopedCount: updRows.filter(r => !r.bump && inScope(r)).length
+    readonly property int scopedBumps: updRows.filter(r => r.bump && inScope(r)).length
     // ignored entries as rows: "name" or "name@version"
     readonly property var ignoredRows: MiseService.ignored.map(k => {
         const m = k.match(/^(.*)@([^\/@:]+)$/);
@@ -69,7 +113,22 @@ Item {
         };
     })
     readonly property bool ignoredView: tab === 0 && backend === "__ignored"
-    readonly property var baseNames: tab === 0 ? updRows.map(t => t.name) : MiseService.installed
+    // tools tab: every tool of the picked scope(s), one row per tool and scope
+    readonly property var installedRows: {
+        const out = [];
+        (scope === "*" ? [""].concat(MiseService.scopes) : [scope]).forEach(s => {
+            const v = MiseService.toolsIn(s);
+            MiseService.installedIn(s).forEach(n => out.push({
+                        name: n,
+                        scope: s,
+                        installed: true,
+                        direct: false,
+                        sub: (v[n] || "") + (showScope ? (v[n] ? " · " : "") + MiseService.scopeLabel(s) : "")
+                    }));
+        });
+        return out.sort((a, b) => a.name.localeCompare(b.name) || a.scope.localeCompare(b.scope));
+    }
+    readonly property var baseNames: tab === 0 ? updRows.filter(inScope).map(t => t.name) : installedRows.map(t => t.name)
     readonly property var backends: {
         const c = {};
         baseNames.forEach(n => {
@@ -81,23 +140,18 @@ Item {
                     label: k + " " + c[k]
                 }));
     }
-    readonly property var updList: (ignoredView ? ignoredRows : updRows).filter(t => t.name.toLowerCase().includes(updFilter.trim().toLowerCase()) && (!backend || ignoredView || MiseService.backendOf(t.name) === backend))
+    readonly property var updList: (ignoredView ? ignoredRows : updRows).filter(t => t.name.toLowerCase().includes(updFilter.trim().toLowerCase()) && (!backend || ignoredView || MiseService.backendOf(t.name) === backend) && (ignoredView || inScope(t)))
     // tools tab: no query -> what you have installed; query -> installed matches, then registry hits
     readonly property var toolList: {
         const q = query.trim().toLowerCase();
-        const inst = n => ({
-                name: n,
-                installed: true,
-                direct: false,
-                sub: MiseService.versions[n] || ""
-            });
         if (!q)
-            return MiseService.installed.filter(n => !backend || MiseService.backendOf(n) === backend).slice().sort().map(inst);
-        return MiseService.installed.filter(n => n.toLowerCase().includes(q)).slice().sort().map(inst).concat(MiseService.search(query).filter(r => !r.installed).map(r => ({
+            return installedRows.filter(r => !backend || MiseService.backendOf(r.name) === backend);
+        return installedRows.filter(r => r.name.toLowerCase().includes(q)).concat(MiseService.search(query, target).filter(r => !r.installed).map(r => ({
                         name: r.name,
+                        scope: target,
                         installed: false,
                         direct: r.direct,
-                        sub: r.backend
+                        sub: r.backend + (scope === "*" && MiseService.scopes.length ? " · installs globally" : "")
                     })));
     }
     readonly property int shown: tab === 0 ? updList.length : toolList.length
@@ -110,6 +164,7 @@ Item {
         height: pop.controlH
 
         DankButtonGroup {
+            id: toolbarTabs
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
             buttonHeight: pop.iconBtn
@@ -121,7 +176,73 @@ Item {
             }
         }
 
+        // scope picker: one compact button instead of a chip row, so it scales to any number of projects
+        Rectangle {
+            id: scopeBtn
+            visible: MiseService.projectsMode !== "off"
+            anchors.right: refreshBtn.left
+            anchors.rightMargin: Theme.spacingXS
+            anchors.verticalCenter: parent.verticalCenter
+            height: pop.iconBtn
+            // the label is what shrinks (elided) when the project name is long
+            readonly property real maxLabelW: pop.width - toolbarTabs.width - refreshBtn.width - Theme.spacingM * 4 - (Theme.iconSize - 6) * 2 - Theme.spacingXS * 2
+            width: scopeBtnRow.implicitWidth + Theme.spacingM * 2
+            radius: Theme.cornerRadius
+            color: pop.menuOpen || scopeHover.containsMouse ? Theme.primaryHoverLight : Theme.surfaceContainerHigh
+            border.width: pop.scope !== "*" ? 1 : 0
+            border.color: Theme.primary
+            // something is pending in a scope you are not looking at
+            Rectangle {
+                visible: pop.elsewhere > 0
+                anchors.top: parent.top
+                anchors.right: parent.right
+                anchors.topMargin: -Theme.spacingXXS
+                anchors.rightMargin: -Theme.spacingXXS
+                width: Theme.spacingS + Theme.spacingXXS
+                height: width
+                radius: width / 2
+                color: Theme.primary
+                border.width: 1
+                border.color: Theme.surface
+            }
+            MouseArea {
+                id: scopeHover
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: pop.menuOpen ? pop.closeMenu() : (pop.menuOpen = true)
+            }
+            Row {
+                id: scopeBtnRow
+                anchors.centerIn: parent
+                spacing: Theme.spacingXS
+                DankIcon {
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: pop.scope === "*" ? "layers" : (pop.scope === "" ? "public" : "folder")
+                    size: Theme.iconSize - 6
+                    color: pop.scope === "*" ? Theme.surfaceVariantText : Theme.primary
+                }
+                StyledText {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Math.min(implicitWidth, scopeBtn.maxLabelW)
+                    text: pop.scopeName
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceText
+                    elide: Text.ElideRight
+                    wrapMode: Text.NoWrap
+                    maximumLineCount: 1
+                }
+                DankIcon {
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: pop.menuOpen ? "arrow_drop_up" : "arrow_drop_down"
+                    size: Theme.iconSize - 6
+                    color: Theme.surfaceVariantText
+                }
+            }
+        }
+
         DankActionButton {
+            id: refreshBtn
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             iconName: "refresh"
@@ -180,6 +301,38 @@ Item {
         }
     }
 
+    Connections {
+        target: MiseService
+        function onScopesChanged() {
+            if (pop.scope !== "*" && pop.scope !== "" && !MiseService.scopes.includes(pop.scope))
+                pop.scope = "";
+        }
+        function onProjectsModeChanged() {
+            if (MiseService.projectsMode === "off") {
+                pop.scope = "";
+                pop.closeMenu();
+            }
+        }
+        function onProjectAdded(path) {
+            if (!pop.addPending)
+                return;
+            pop.addPending = false;
+            pop.scope = path;
+            addField.text = "";
+            pop.closeMenu();
+        }
+        function onProjectAddFailed(message) {
+            if (!pop.addPending)
+                return;
+            pop.addPending = false;
+            // typed: the error shows under the field. Picked: the menu is already closed, so a toast
+            if (pop.adding)
+                addErr.text = message;
+            else
+                ToastService.showError("mise", message);
+        }
+    }
+
     // ---- search / filter field ----
     DankTextField {
         id: field
@@ -202,7 +355,7 @@ Item {
                 return;
             const r = pop.toolList.find(x => !x.installed);
             if (r)
-                MiseService.install(r.name);
+                MiseService.install(r.name, pop.target);
         }
     }
 
@@ -242,22 +395,22 @@ Item {
         visible: pop.tab === 0
         anchors.bottom: parent.bottom
         width: bumpAll.visible ? (parent.width - Theme.spacingS) / 2 : parent.width
-        text: pop.count > 0 ? "Update all (" + pop.count + ")" : "Update all"
+        text: pop.scopedCount > 0 ? "Update all (" + pop.scopedCount + ")" : "Update all"
         iconName: "upgrade"
         buttonHeight: pop.controlH + Theme.spacingXS
-        enabled: pop.count > 0 && !MiseService.busy
-        onClicked: MiseService.upgrade("")
+        enabled: pop.scopedCount > 0 && !MiseService.busy
+        onClicked: MiseService.upgrade("", pop.scope)
     }
 
     // rewrites pins in your config: arm first, click again to confirm
     DankButton {
         id: bumpAll
         property bool armed: false
-        visible: pop.tab === 0 && MiseService.bumps.length > 0
+        visible: pop.tab === 0 && pop.scopedBumps > 0
         anchors.bottom: parent.bottom
         anchors.right: parent.right
         width: (parent.width - Theme.spacingS) / 2
-        text: armed ? "Confirm bump (" + MiseService.bumps.length + ")" : "Bump all (" + MiseService.bumps.length + ")"
+        text: armed ? "Confirm bump (" + pop.scopedBumps + ")" : "Bump all (" + pop.scopedBumps + ")"
         iconName: armed ? "check" : "upgrade"
         buttonHeight: pop.controlH + Theme.spacingXS
         backgroundColor: armed ? Theme.error : Theme.warning
@@ -269,7 +422,7 @@ Item {
                 bumpReset.restart();
             } else {
                 armed = false;
-                MiseService.bumpAll();
+                MiseService.bumpAll(pop.scope);
             }
         }
         Timer {
@@ -367,7 +520,12 @@ Item {
                         return MiseService.error;
                     if (MiseService.checking)
                         return "Checking for updates…";
-                    return pop.count > 0 ? "No updates match" : "Everything is up to date";
+                    if (pop.updFilter.trim() !== "" || pop.backend !== "")
+                        return "No updates match";
+                    // up to date here, but other scopes have something pending: say so
+                    if (pop.elsewhere > 0)
+                        return pop.scopeName + " is up to date · " + pop.elsewhereText;
+                    return "Everything is up to date";
                 }
                 if (!pop.searching)
                     return "Nothing installed yet.\nType a name, or any backend:tool\ne.g. pipx:package, npm:package, cargo:crate, github:owner/repo\nOptions: pipx:package[uvx_args=--python 3.14]";
@@ -425,7 +583,7 @@ Item {
                     }
                     StyledText {
                         width: parent.width
-                        text: modelData.ignoredKey ? (modelData.latest ? "skipping " + modelData.latest : "ignored · all versions") : modelData.current + " → " + modelData.latest + (modelData.bump ? " · bump (requested " + modelData.requested + ")" : "")
+                        text: modelData.ignoredKey ? (modelData.latest ? "skipping " + modelData.latest : "ignored · all versions") : modelData.current + " → " + modelData.latest + (modelData.bump ? " · bump (requested " + modelData.requested + ")" : "") + (pop.showScope ? " · " + MiseService.scopeLabel(modelData.scope) : "")
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.surfaceVariantText
                         elide: Text.ElideRight
@@ -471,9 +629,9 @@ Item {
                         iconSize: pop.actionIcon
                         iconName: modelData.bump ? "upgrade" : "download"
                         iconColor: modelData.bump ? Theme.warning : Theme.primary
-                        tooltipText: modelData.bump ? "Bump: rewrites \"" + modelData.requested + "\" in your mise config" : "Update"
+                        tooltipText: modelData.bump ? "Bump: rewrites \"" + modelData.requested + "\" in your " + (modelData.scope ? "project's" : "global") + " mise config" : "Update"
                         enabled: !MiseService.busy
-                        onClicked: modelData.bump ? MiseService.bump(modelData.name) : MiseService.upgrade(modelData.name)
+                        onClicked: modelData.bump ? MiseService.bump(modelData.name, modelData.scope) : MiseService.upgrade(modelData.name, modelData.scope)
                     }
                 }
             }
@@ -555,20 +713,237 @@ Item {
                     iconName: modelData.installed ? (row.confirm ? "check" : "delete") : "download"
                     iconColor: modelData.installed ? (row.confirm ? Theme.surface : Theme.error) : Theme.primary
                     backgroundColor: row.confirm ? Theme.error : "transparent"
-                    tooltipText: modelData.installed ? (row.confirm ? "Click again to remove" : "Remove") : "Install"
+                    tooltipText: modelData.installed ? (row.confirm ? "Click again to remove" : "Remove" + MiseService.inLabel(modelData.scope)) : "Install" + (pop.target ? MiseService.inLabel(pop.target) : "")
                     enabled: !MiseService.busy
                     onClicked: {
                         if (!modelData.installed) {
-                            MiseService.install(modelData.name);
+                            MiseService.install(modelData.name, pop.target);
                         } else if (!row.confirm) {
                             row.confirm = true;
                             confirmReset.restart();
                         } else {
-                            MiseService.uninstall(modelData.name);
+                            MiseService.uninstall(modelData.name, modelData.scope);
                         }
                     }
                 }
             }
+        }
+    }
+
+    // ---- scope menu: opens under the toolbar button. The scrim swallows clicks outside, so nothing else
+    // in the panel is reachable (or half-typed) while it is open ----
+    MouseArea {
+        anchors.fill: parent
+        z: 10
+        visible: pop.menuOpen
+        onClicked: pop.closeMenu()
+    }
+
+    Rectangle {
+        id: scopeMenu
+        z: 11
+        visible: pop.menuOpen
+        anchors.top: toolbar.bottom
+        anchors.topMargin: Theme.spacingXS
+        anchors.right: parent.right
+        width: Math.min(parent.width, pop.controlH * 7)
+        height: menuCol.implicitHeight + Theme.spacingXS * 2
+        radius: Theme.cornerRadius
+        color: Theme.surfaceContainerHigh
+        border.width: 1
+        border.color: Theme.withAlpha(Theme.outline, 0.3)
+
+        Column {
+            id: menuCol
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: Theme.spacingXS
+            spacing: Theme.spacingXXS
+
+            // at most ~6 rows tall, scrolls beyond that
+            Flickable {
+                width: parent.width
+                height: Math.min(optCol.implicitHeight, pop.controlH * 6)
+                contentHeight: optCol.implicitHeight
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+
+                Column {
+                    id: optCol
+                    width: parent.width
+                    Repeater {
+                        model: pop.scopeOptions
+                        delegate: Rectangle {
+                            required property var modelData
+                            readonly property bool active: pop.scope === modelData.key
+                            readonly property bool isProject: modelData.key !== "*" && modelData.key !== ""
+                            width: optCol.width
+                            height: pop.controlH
+                            radius: Theme.cornerRadius
+                            color: optHover.containsMouse ? Theme.primaryHoverLight : "transparent"
+                            MouseArea {
+                                id: optHover
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    pop.scope = modelData.key;
+                                    pop.closeMenu();
+                                }
+                            }
+                            DankIcon {
+                                id: optIcon
+                                anchors.left: parent.left
+                                anchors.leftMargin: Theme.spacingS
+                                anchors.verticalCenter: parent.verticalCenter
+                                name: parent.active ? "check" : (modelData.key === "*" ? "layers" : (modelData.key === "" ? "public" : "folder"))
+                                size: Theme.iconSize - 6
+                                color: parent.active ? Theme.primary : Theme.surfaceVariantText
+                            }
+                            StyledText {
+                                anchors.left: optIcon.right
+                                anchors.leftMargin: Theme.spacingS
+                                anchors.right: optCount.visible ? optCount.left : (optRemove.visible ? optRemove.left : parent.right)
+                                anchors.rightMargin: Theme.spacingS
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: modelData.label
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.weight: parent.active ? Font.Medium : Font.Normal
+                                color: Theme.surfaceText
+                                elide: Text.ElideRight
+                                wrapMode: Text.NoWrap
+                                maximumLineCount: 1
+                            }
+                            // how many updates are waiting in this scope
+                            StyledText {
+                                id: optCount
+                                visible: pop.pendingIn(modelData.key) > 0
+                                anchors.right: optRemove.visible ? optRemove.left : parent.right
+                                anchors.rightMargin: Theme.spacingS
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: pop.pendingIn(modelData.key)
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.family: Theme.monoFontFamily
+                                color: Theme.primary
+                            }
+                            // stop following: only edits the plugin's list, the config file is never touched
+                            DankActionButton {
+                                id: optRemove
+                                visible: parent.isProject
+                                anchors.right: parent.right
+                                anchors.rightMargin: Theme.spacingXXS
+                                anchors.verticalCenter: parent.verticalCenter
+                                buttonSize: pop.iconBtn - Theme.spacingXS
+                                iconSize: pop.actionIcon - Theme.spacingXS
+                                iconName: "close"
+                                iconColor: Theme.surfaceVariantText
+                                tooltipText: "Stop following (the config file is not touched)"
+                                onClicked: MiseService.removeProject(modelData.key)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 1
+                color: Theme.withAlpha(Theme.outline, 0.2)
+            }
+
+            // "Add project…" row, which turns into the input in place
+            Rectangle {
+                visible: !pop.adding
+                width: parent.width
+                height: pop.controlH
+                radius: Theme.cornerRadius
+                color: addHover.containsMouse ? Theme.primaryHoverLight : "transparent"
+                MouseArea {
+                    id: addHover
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        pop.closeMenu();
+                        projectPicker.open();
+                    }
+                }
+                // the row opens the folder browser; this is the way to paste a path or a config file
+                DankActionButton {
+                    anchors.right: parent.right
+                    anchors.rightMargin: Theme.spacingXXS
+                    anchors.verticalCenter: parent.verticalCenter
+                    buttonSize: pop.iconBtn - Theme.spacingXS
+                    iconSize: pop.actionIcon - Theme.spacingXS
+                    iconName: "keyboard"
+                    iconColor: Theme.surfaceVariantText
+                    tooltipText: "Type a path instead"
+                    onClicked: {
+                        pop.adding = true;
+                        addField.forceActiveFocus();
+                    }
+                }
+                DankIcon {
+                    id: addIcon
+                    anchors.left: parent.left
+                    anchors.leftMargin: Theme.spacingS
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: "add"
+                    size: Theme.iconSize - 6
+                    color: Theme.primary
+                }
+                StyledText {
+                    anchors.left: addIcon.right
+                    anchors.leftMargin: Theme.spacingS
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Add project…"
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.primary
+                }
+            }
+
+            Column {
+                visible: pop.adding
+                width: parent.width
+                spacing: Theme.spacingXXS
+                DankTextField {
+                    id: addField
+                    width: parent.width
+                    height: pop.controlH
+                    leftIconName: "folder"
+                    placeholderText: "Folder or mise config path, Enter"
+                    onTextEdited: addErr.text = ""
+                    onAccepted: {
+                        pop.addPending = true;
+                        MiseService.addProject(text);
+                    }
+                }
+                StyledText {
+                    id: addErr
+                    width: parent.width
+                    visible: text !== ""
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.error
+                    wrapMode: Text.WordWrap
+                }
+            }
+        }
+    }
+
+    // DMS's own folder browser (overlay layer, keeps the popout open). The folder is what gets followed:
+    // the service finds its mise config, or rejects it.
+    FileBrowserSurfaceModal {
+        id: projectPicker
+        browserTitle: "Choose a project folder"
+        browserIcon: "folder"
+        browserType: "generic"
+        folderMode: true
+        showHiddenFiles: true
+        onFileSelected: path => {
+            pop.addPending = true;
+            MiseService.addProject(MiseService.plainPath(path));
+            close();
         }
     }
 }

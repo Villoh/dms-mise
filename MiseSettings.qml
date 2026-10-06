@@ -3,6 +3,7 @@ import qs.Common
 import qs.Widgets
 import qs.Services
 import qs.Modules.Plugins
+import qs.Modals.FileBrowser
 
 PluginSettings {
     id: root
@@ -73,6 +74,173 @@ PluginSettings {
         label: "Live search and verification"
         description: "While you type in Tools / the launcher, query npm and crates.io (gem, dotnet and GitHub after their `backend:` prefix) and check that a typed `backend:tool` exists. Sends what you type to those sites. Off = registry only."
         defaultValue: true
+    }
+
+    SelectionSetting {
+        settingKey: "projectsMode"
+        label: "Project tools"
+        description: "Also list, update, install and remove tools of project configs (mise.toml), not just the global one. Off: global only. Manual: only the projects you add below. Tracked: every config mise has already seen, plus the ones you add."
+        options: [
+            {label: "Off", value: "off"},
+            {label: "Manual", value: "manual"},
+            {label: "Tracked", value: "tracked"}
+        ]
+        defaultValue: "off"
+    }
+
+    SelectionSetting {
+        visible: MiseService.projectsMode !== "off"
+        settingKey: "badgeScope"
+        label: "Bar badge counts"
+        description: "Global: only the global config, as before. Global + projects: also the updates and bumps of the projects you follow. The popout always shows the scope you pick there."
+        options: [
+            {label: "Global", value: "global"},
+            {label: "Global + projects", value: "all"}
+        ]
+        defaultValue: "global"
+    }
+
+    // Projects: the ones you added, and the tracked ones you dropped. Same lists as the scope picker in the popout.
+    Column {
+        id: projectsSection
+        width: parent.width
+        spacing: Theme.spacingS
+
+        readonly property bool active: MiseService.projectsMode !== "off"
+
+        Connections {
+            target: MiseService
+            function onProjectAdded(path) {
+                pathField.text = "";
+                addError.text = "";
+            }
+            function onProjectAddFailed(message) {
+                addError.text = message;
+            }
+        }
+
+        StyledText {
+            text: "Projects"
+            font.pixelSize: Theme.fontSizeMedium
+            font.weight: Font.Medium
+            color: Theme.surfaceText
+        }
+
+        StyledText {
+            width: parent.width
+            text: projectsSection.active ? "Browse for a project folder, or type the path of the folder or of its mise config file. Removing a project only stops following it, the file is never touched." : "Turn on Project tools above to follow projects."
+            font.pixelSize: Theme.fontSizeSmall
+            color: Theme.surfaceVariantText
+            wrapMode: Text.WordWrap
+        }
+
+        Row {
+            width: parent.width
+            spacing: Theme.spacingS
+            visible: projectsSection.active
+
+            DankTextField {
+                id: pathField
+                width: parent.width - browseBtn.width - addBtn.width - parent.spacing * 2
+                leftIconName: "folder"
+                placeholderText: "~/code/my-project"
+                onTextEdited: addError.text = ""
+                onAccepted: MiseService.addProject(text)
+            }
+
+            DankButton {
+                id: browseBtn
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Browse"
+                iconName: "folder_open"
+                buttonHeight: pathField.height
+                onClicked: projectPicker.open()
+            }
+
+            DankButton {
+                id: addBtn
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Add"
+                iconName: "add"
+                buttonHeight: pathField.height
+                onClicked: MiseService.addProject(pathField.text)
+            }
+        }
+
+        StyledText {
+            id: addError
+            width: parent.width
+            visible: text !== ""
+            font.pixelSize: Theme.fontSizeSmall
+            color: Theme.error
+            wrapMode: Text.WordWrap
+        }
+
+        StyledText {
+            width: parent.width
+            visible: projectsSection.active && MiseService.projects.length === 0
+            text: "No projects added."
+            font.pixelSize: Theme.fontSizeSmall
+            color: Theme.surfaceVariantText
+        }
+
+        // your list, then the tracked ones you hid (undo)
+        Repeater {
+            model: projectsSection.active ? MiseService.projects.map(p => ({
+                        path: p,
+                        hidden: false
+                    })).concat(MiseService.projectsMode === "tracked" ? MiseService.hiddenProjects.filter(p => MiseService.trackedProjects.includes(p) && !MiseService.projects.includes(p)).map(p => ({
+                                path: p,
+                                hidden: true
+                            })) : []) : []
+            delegate: Rectangle {
+                required property var modelData
+                width: projectsSection.width
+                height: Theme.iconSize + Theme.spacingL
+                radius: Theme.cornerRadius
+                color: Theme.withAlpha(Theme.surfaceVariant, 0.1)
+
+                StyledText {
+                    anchors.left: parent.left
+                    anchors.leftMargin: Theme.spacingM
+                    anchors.right: rowBtn.left
+                    anchors.rightMargin: Theme.spacingS
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: MiseService.scopeLabel(modelData.path) + "  ·  " + modelData.path + (modelData.hidden ? "  ·  hidden" : "")
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: modelData.hidden ? Theme.surfaceVariantText : Theme.surfaceText
+                    elide: Text.ElideMiddle
+                    wrapMode: Text.NoWrap
+                    maximumLineCount: 1
+                }
+
+                DankActionButton {
+                    id: rowBtn
+                    anchors.right: parent.right
+                    anchors.rightMargin: Theme.spacingXS
+                    anchors.verticalCenter: parent.verticalCenter
+                    buttonSize: Theme.iconSize + Theme.spacingS
+                    iconSize: Theme.iconSize - Theme.spacingS
+                    iconName: modelData.hidden ? "undo" : "close"
+                    iconColor: modelData.hidden ? Theme.primary : Theme.surfaceVariantText
+                    tooltipText: modelData.hidden ? "Follow again" : "Stop following"
+                    onClicked: modelData.hidden ? MiseService.showProject(modelData.path) : MiseService.removeProject(modelData.path)
+                }
+            }
+        }
+    }
+
+    FileBrowserSurfaceModal {
+        id: projectPicker
+        browserTitle: "Choose a project folder"
+        browserIcon: "folder"
+        browserType: "generic"
+        folderMode: true
+        showHiddenFiles: true
+        onFileSelected: path => {
+            MiseService.addProject(MiseService.plainPath(path));
+            close();
+        }
     }
 
     // Ignored updates (skipped versions / ignored tools). Same list as the `ignored N` chip in the popout.

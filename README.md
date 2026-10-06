@@ -57,7 +57,25 @@ Row buttons need the mouse; Enter in the search field installs the first result 
 
 ## Launcher
 
-`mise` + query: upgrades for outdated tools (empty query also offers *Upgrade all*), installs from the registry or any `backend:tool`. Installed tools can be removed with Tab / right-click → *Remove*.
+`mise` + query: upgrades for outdated tools (empty query also offers *Upgrade all*), installs from the registry or any `backend:tool`. Installed tools can be removed with Tab / right-click → *Remove*. With *Project tools* on, that menu also lists one *Install in / Remove from `<project>`* entry per followed project, and upgrade rows carry the project name.
+
+## Project tools
+
+By default the plugin only manages the **global** config. Turn on *Project tools* in Settings to also list, update, bump, install and remove tools declared in project configs (`mise.toml`, `.mise.toml`, `.config/mise/config.toml`, ...):
+
+| Mode | Projects followed |
+| --- | --- |
+| Off (default) | none, nothing changes |
+| Manual | only the ones you add |
+| Tracked | every config mise has already seen (`<state dir>/tracked-configs`, existing files only, the global config and `/tmp` skipped) plus the ones you add |
+
+Add a project from Settings → *Projects* (**Browse** or type the path), or from the popout: scope button → *Add project…* opens DMS's folder browser; the keyboard icon on that row lets you paste a folder or a config file path instead (`~` works). Either way it is checked before it is saved, and a folder without a mise config is rejected. The **x** next to a project in the scope menu (or the list in Settings) stops following it. That only edits the plugin's list: a tracked project is hidden (undo in Settings), and no config file is ever touched.
+
+In the popout, the scope button next to refresh opens a menu: **Global** (the default, so nothing changes until you pick something else), **All** or one project. *Update all* and *Bump all* act on the picked scope, and **Install writes to the picked project** (to global when *All* is selected). Rows show where they come from when *All* is selected. Only the tools a project config declares are listed for it; inherited global tools stay under *Global*.
+
+The bar badge counts **Global** only by default; *Bar badge counts* in Settings switches it to global + the projects you follow. The popout's header, tab count and *Update all* always follow the scope picked in its menu, and a dot on the scope button (plus a hint in the empty list) tells you when another scope has something pending.
+
+The tracked list is mise's internal state, not a stable API. If it ever changes shape, *Tracked* finds nothing and *Manual* keeps working.
 
 ## Installing anything, with options
 
@@ -93,27 +111,28 @@ No search for `aqua`, `gitlab` (search is unranked noise), `ubi`, `spm`, `http`,
 
 ## Settings
 
-Settings → Plugins → mise: check interval (15 min, 30 min, 1 h, 4 h, daily). Default 30 min. Also: keybind panel mode and tab, pinned/major updates, live search toggle.
+Settings → Plugins → mise: check interval (15 min, 30 min, 1 h, 4 h, daily). Default 30 min. Also: keybind panel mode and tab, pinned/major updates, live search toggle, project tools (off / manual / tracked) and the project list.
 
 ## What it runs
 
 | Action | Command |
 | --- | --- |
-| Check | `mise outdated --json`, `mise outdated --bump --json`, `mise ls --json` |
+| Check | `mise outdated --json`, `mise outdated --bump --json`, `mise ls --json` (and the same with `-C <project>` per followed project) |
 | Registry | `mise registry` (once, at load) |
 | Live search | `curl` to registry.npmjs.org, crates.io, api.github.com, pypi.org (only while typing, see above) |
-| Update | `mise upgrade --yes [tool]` |
-| Bump | `mise upgrade --bump --yes <tool>` |
-| Install | `mise use --global --yes <tool>` |
-| Remove | `mise unuse --global --yes <tool>` |
+| Update | `mise upgrade --yes [tool]` (`mise -C <project> upgrade ...` for a project) |
+| Bump | `mise upgrade --bump --yes <tool>` (same `-C`) |
+| Install | `mise use --global --yes <tool>`, or `mise use --path <config> --yes <tool>` for a project |
+| Remove | `mise unuse --global --yes <tool>`, or `mise unuse --path <config> --yes <tool>` for a project |
 
 One job at a time.
 
 ## Limits
 
-- `install` and `remove` write the **global** mise config (`~/.config/mise/config.toml`). If that file is managed (chezmoi, home-manager) it ends up dirty or read-only.
-- `remove` only works for tools in the global config; one that lives only in a project `mise.toml` fails with mise's error.
-- `mise upgrade` respects the requested version (`node = "22"` never goes to 24, an exact pin never moves). Those show as **bump** rows (warning icon, from `mise outdated --bump`) with their own button, which runs `mise upgrade --bump <tool>` and rewrites the version in the global config. Bumps are not counted in the badge and are never part of *Update all*. Turn them off in Settings.
+- Without a project selected, `install` and `remove` write the **global** mise config (`~/.config/mise/config.toml`). If that file is managed (chezmoi, home-manager) it ends up dirty or read-only. Project installs write that project's `mise.toml`, so they show up in git.
+- `remove` only works on the config you pick: a tool declared only in a project fails on *Global* (and the other way round) with mise's error.
+- Project configs that mise does not trust may fail to load; that project then shows nothing.
+- `mise upgrade` respects the requested version (`node = "22"` never goes to 24, an exact pin never moves). Those show as **bump** rows (warning icon, from `mise outdated --bump`) with their own button, which runs `mise upgrade --bump <tool>` and rewrites the version in the config that declares the tool. Bumps are not counted in the badge and are never part of *Update all*. Turn them off in Settings.
 - It does not update the mise binary itself. If mise comes from nix/a package manager, update it there.
 - Old inactive versions are not pruned. Skipped versions that were superseded stay in the ignored list until you undo them.
 - No install-time options UI: use the bracket syntax above.
