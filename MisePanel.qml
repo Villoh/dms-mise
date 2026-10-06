@@ -269,7 +269,7 @@ Item {
         anchors.topMargin: visible ? Theme.spacingS : 0
         width: parent.width
         visible: !pop.searching && (pop.backends.length > 1 || (pop.tab === 0 && MiseService.ignored.length > 0))
-        height: visible ? 30 : 0
+        height: visible ? pop.chipH : 0
         contentWidth: chipRow.width
         clip: true
         boundsBehavior: Flickable.StopAtBounds
