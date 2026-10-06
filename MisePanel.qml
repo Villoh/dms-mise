@@ -437,6 +437,35 @@ Item {
         }
     }
 
+    // versions no config uses: arm first, click again to confirm
+    DankButton {
+        id: pruneAll
+        property bool armed: false
+        visible: pop.tab === 1 && MiseService.prunableCount > 0
+        anchors.bottom: parent.bottom
+        width: parent.width
+        text: armed ? "Confirm prune (" + MiseService.prunableCount + ")" : "Prune unused versions (" + MiseService.prunableCount + ")"
+        iconName: armed ? "check" : "delete_sweep"
+        buttonHeight: pop.controlH + Theme.spacingXS
+        backgroundColor: armed ? Theme.error : Theme.surfaceContainerHigh
+        textColor: armed ? Theme.surface : Theme.surfaceText
+        enabled: !MiseService.busy
+        onClicked: {
+            if (!armed) {
+                armed = true;
+                pruneAllReset.restart();
+            } else {
+                armed = false;
+                MiseService.prune("");
+            }
+        }
+        Timer {
+            id: pruneAllReset
+            interval: 3000
+            onTriggered: pruneAll.armed = false
+        }
+    }
+
     Connections {
         target: MiseService
         function onIgnoredChanged() {
@@ -505,8 +534,8 @@ Item {
     Rectangle {
         anchors.top: chips.bottom
         anchors.topMargin: Theme.spacingS
-        anchors.bottom: updAll.visible ? updAll.top : parent.bottom
-        anchors.bottomMargin: updAll.visible ? Theme.spacingS : 0
+        anchors.bottom: updAll.visible ? updAll.top : pruneAll.visible ? pruneAll.top : parent.bottom
+        anchors.bottomMargin: updAll.visible || pruneAll.visible ? Theme.spacingS : 0
         width: parent.width
         radius: Theme.cornerRadius
         color: Theme.withAlpha(Theme.surfaceVariant, 0.1)
@@ -658,6 +687,13 @@ Item {
                 readonly property string key: modelData.name + "|" + modelData.scope
                 readonly property bool open: pop.openRow === key
                 readonly property var info: MiseService.info[MiseService.bareName(modelData.name)] || ({})
+                readonly property var unused: MiseService.prunable[MiseService.bareName(modelData.name)] || []
+                // the latest versions, plus installed ones too old to be among them (so they can be removed)
+                readonly property var chipVersions: {
+                    const v = info.versions || [];
+                    return v.concat(((info.meta || {}).installed_versions || []).filter(x => !v.includes(x)));
+                }
+                property bool pruneArmed: false   // prune is two-step, like remove
                 width: ListView.view ? ListView.view.width : 0
                 height: open ? pop.rowH + details.implicitHeight + Theme.spacingS : pop.rowH
                 clip: true
@@ -793,25 +829,91 @@ Item {
                     Flow {
                         width: parent.width
                         spacing: Theme.spacingXS
-                        visible: !!row.info.versions
+                        visible: row.chipVersions.length > 0 || row.unused.length > 0
+
+                        // versions no tracked config uses: same shape as a version chip, with a broom
+                        Rectangle {
+                            visible: row.unused.length > 0
+                            width: Math.min(details.width, pruneRow.implicitWidth + Theme.spacingM * 2)
+                            height: pop.chipH
+                            radius: Theme.cornerRadius
+                            color: row.pruneArmed ? Theme.error : (pruneArea.containsMouse && !MiseService.busy ? Theme.withAlpha(Theme.error, 0.15) : "transparent")
+                            border.width: 1
+                            border.color: row.pruneArmed ? Theme.error : Theme.withAlpha(Theme.outline, 0.4)
+                            opacity: MiseService.busy ? 0.5 : 1
+                            Row {
+                                id: pruneRow
+                                anchors.centerIn: parent
+                                spacing: Theme.spacingXXS
+                                DankIcon {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    name: row.pruneArmed ? "check" : "delete_sweep"
+                                    size: Theme.fontSizeMedium
+                                    color: row.pruneArmed ? Theme.surface : Theme.error
+                                }
+                                StyledText {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: row.pruneArmed ? "Remove " + row.unused.join(", ") + "?" : "Prune " + row.unused.length + " unused"
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: row.pruneArmed ? Theme.surface : Theme.surfaceText
+                                }
+                            }
+                            Timer {
+                                id: pruneReset
+                                interval: 3000
+                                onTriggered: row.pruneArmed = false
+                            }
+                            MouseArea {
+                                id: pruneArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                enabled: !MiseService.busy
+                                onClicked: {
+                                    if (!row.pruneArmed) {
+                                        row.pruneArmed = true;
+                                        pruneReset.restart();
+                                    } else {
+                                        row.pruneArmed = false;
+                                        MiseService.prune(MiseService.bareName(row.modelData.name));
+                                    }
+                                }
+                            }
+                        }
 
                         Repeater {
-                            model: row.info.versions || []
+                            model: row.chipVersions
                             delegate: Rectangle {
                                 id: chip
                                 required property string modelData
+                                property bool armed: false   // removing a version is two-step
                                 readonly property bool have: ((row.info.meta || {}).installed_versions || []).includes(modelData)
                                 readonly property bool active: ((row.info.meta || {}).active_versions || []).includes(modelData)
-                                width: chipRow.implicitWidth + Theme.spacingM * 2
+                                width: Theme.spacingM + chipRow.implicitWidth + (trashBtn.visible ? Theme.spacingS + trashBtn.width + trashBtn.anchors.rightMargin : Theme.spacingM)
                                 height: pop.chipH
                                 radius: Theme.cornerRadius
                                 color: chipArea.containsMouse && !MiseService.busy ? Theme.primaryHoverLight : chip.active ? Theme.withAlpha(Theme.primary, 0.2) : "transparent"
                                 border.width: chip.active ? 2 : 1
                                 border.color: chip.active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.4)
                                 opacity: MiseService.busy ? 0.5 : 1
+                                Timer {
+                                    id: chipReset
+                                    interval: 3000
+                                    onTriggered: chip.armed = false
+                                }
+                                MouseArea {
+                                    id: chipArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    enabled: !MiseService.busy
+                                    onClicked: MiseService.install(MiseService.bareName(row.modelData.name) + "@" + chip.modelData, row.modelData.scope)
+                                }
                                 Row {
                                     id: chipRow
-                                    anchors.centerIn: parent
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: Theme.spacingM
+                                    anchors.verticalCenter: parent.verticalCenter
                                     spacing: Theme.spacingXXS
                                     DankIcon {
                                         visible: chip.have
@@ -827,12 +929,39 @@ Item {
                                         color: chip.have ? Theme.surfaceVariantText : Theme.primary
                                     }
                                 }
-                                MouseArea {
-                                    id: chipArea
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    enabled: !MiseService.busy
-                                    onClicked: MiseService.install(MiseService.bareName(row.modelData.name) + "@" + chip.modelData, row.modelData.scope)
+                                // installed, not the active one (that one goes with the tool's own bin)
+                                Rectangle {
+                                    id: trashBtn
+                                    visible: chip.have && !chip.active
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: (parent.height - height) / 2   // same gap on every side
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: pop.chipH - Theme.spacingS
+                                    height: width
+                                    radius: Math.max(0, Math.min(parent.radius, parent.height / 2) - anchors.rightMargin)   // concentric with the chip
+                                    color: chip.armed ? Theme.error : (trashArea.containsMouse ? Theme.withAlpha(Theme.error, 0.2) : "transparent")
+                                    DankIcon {
+                                        anchors.centerIn: parent
+                                        name: chip.armed ? "check" : "delete"
+                                        size: Theme.fontSizeMedium
+                                        color: chip.armed ? Theme.surface : Theme.error
+                                    }
+                                    MouseArea {
+                                        id: trashArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        enabled: !MiseService.busy
+                                        onClicked: {
+                                            if (!chip.armed) {
+                                                chip.armed = true;
+                                                chipReset.restart();
+                                            } else {
+                                                chip.armed = false;
+                                                MiseService.uninstallVersion(MiseService.bareName(row.modelData.name), chip.modelData);
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

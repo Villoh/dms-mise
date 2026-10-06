@@ -103,6 +103,8 @@ Pin a version with `@`: `ripgrep@14.0.3` or `pipx:package@1.2`. The version part
 
 The info button on a Tools row expands it in place (one row at a time): description, backend, installed versions, and the latest 20 versions from the backend. The active version has a highlighted border, installed ones a ✓. Click a version to pin it (`mise use <tool>@<version>`, in the same scope as Install), which also lets you go back to an older release. Answers are cached until the panel is reloaded; a failed lookup is retried when you reopen the row.
 
+Installed versions other than the active one carry a trash icon: click it, then click again to remove just that version (`mise uninstall tool@version`, the config is not touched). Installed versions too old to be in the latest 20 are listed as well. When a tool has versions that no tracked config uses, a *Prune N unused* button removes them. The Tools tab also gets a *Prune unused versions* button at the bottom for all tools. Pruning follows every config mise has tracked, not only the scope you picked.
+
 ### Live search and verification
 
 Beyond the registry, typing in Tools (or the launcher) also queries the package sites, debounced (350 ms, 3+ characters):
@@ -128,6 +130,8 @@ Settings → Plugins → mise: check interval (15 min, 30 min, 1 h, 4 h, daily).
 | Bump | `mise upgrade --bump --yes <tool>` (same `-C`) |
 | Install | `mise use --global --yes <tool>`, or `mise use --path <config> --yes <tool>` for a project |
 | Details | `mise tool --json <tool>`, `mise ls-remote <tool>` (30 s timeout, only when a row is expanded) |
+| Remove a version | `mise uninstall --yes <tool>@<version>` |
+| Prune | `mise ls --prunable --json` (with every check), `mise prune --tools --yes [tool]` |
 | Remove | `mise unuse --global --yes <tool>`, or `mise unuse --path <config> --yes <tool>` for a project |
 
 One job at a time.

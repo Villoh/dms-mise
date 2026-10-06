@@ -13,6 +13,8 @@ Item {
     readonly property var outdated: outdatedRaw.concat(projectOutdated).filter(t => !isIgnored(t.name, t.latest))
     property var installed: []   // ["node", "pipx:harlequin", ...]
     property var versions: ({})  // name -> active version
+    property var prunable: ({})  // name -> [versions] no tracked config uses (`mise ls --prunable`)
+    readonly property int prunableCount: Object.keys(prunable).reduce((n, k) => n + prunable[k].length, 0)
     property var registry: []    // [{name, backend}] ~1000 curated entries
     property bool remoteSearch: true  // query npm / crates.io / GitHub as you type (Settings)
     property string lookupQ: ""       // last query handed to lookup()
@@ -643,6 +645,8 @@ Item {
         }
         if (!lsProc.running)
             lsProc.running = true;
+        if (!pruneProc.running)
+            pruneProc.running = true;
         if (!bumpProc.running)
             bumpProc.running = true;
         refreshProjects();
@@ -822,6 +826,17 @@ Item {
         }
     }
 
+    // removes that one installed version; the config is not touched
+    function uninstallVersion(tool, version) {
+        run(["uninstall", "--yes", tool + "@" + version], "Removing " + tool + "@" + version, "Removed " + tool + "@" + version);
+    }
+
+    // unused versions of one tool, or of every tool when omitted. Not scoped: `mise prune` goes by all
+    // the configs mise has tracked.
+    function prune(tool) {
+        run(["prune", "--tools", "--yes"].concat(tool ? [tool] : []), tool ? "Pruning " + tool : "Pruning unused versions", tool ? "Pruned " + tool : "Pruned unused versions");
+    }
+
     function pushLog(line) {
         const t = line.trim();
         if (t && !t.startsWith("DEBUG"))   // MISE_VERBOSE noise
@@ -902,6 +917,21 @@ Item {
                     const v = {};
                     root.installed.forEach(k => v[k] = (d[k].find(x => x.active) || d[k][0] || {}).version || "");
                     root.versions = v;
+                } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: pruneProc
+        command: ["mise", "ls", "--prunable", "--json"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const d = JSON.parse(text);
+                    const p = {};
+                    Object.keys(d).forEach(k => p[k] = d[k].map(x => x.version));
+                    root.prunable = p;
                 } catch (e) {}
             }
         }
