@@ -19,6 +19,33 @@ Item {
     readonly property real iconBtn: Theme.iconSize + Theme.spacingM
     readonly property real actionIcon: Theme.iconSize - Theme.spacingXS
 
+    // `mise outdated` often ends in a few ms: hold the "checking" look long enough to be seen
+    readonly property int minCheckMs: Math.min(Theme.popoutAnimationDuration * 4, 800)
+    property bool checkingShown: MiseService.checking
+    property double checkStart: 0
+    Connections {
+        target: MiseService
+        function onCheckingChanged() {
+            if (MiseService.checking) {
+                checkHold.stop();
+                pop.checkStart = Date.now();
+                pop.checkingShown = true;
+                return;
+            }
+            const left = pop.minCheckMs - (Date.now() - pop.checkStart);
+            if (left <= 0) {
+                pop.checkingShown = false;
+            } else {
+                checkHold.interval = left;
+                checkHold.restart();
+            }
+        }
+    }
+    Timer {
+        id: checkHold
+        onTriggered: pop.checkingShown = false
+    }
+
     readonly property string summary: MiseService.error || ((count > 0 ? count + " outdated" : (MiseService.scopes.length ? scopeName + " is up to date" : "All up to date")) + (bumpCount ? " · " + bumpCount + " bumpable" : "") + " · " + installedRows.length + " installed" + checkedText)
 
     // on open. "updates" / "tools" are fixed; anything else is auto:
@@ -241,14 +268,62 @@ Item {
             }
         }
 
+        // refresh: hover spins the icon, press shrinks, checking morphs to a circle with a spinner
         DankActionButton {
             id: refreshBtn
+            readonly property bool active: pop.checkingShown
+            property bool hovered: false
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            iconName: "refresh"
+            buttonSize: pop.iconBtn
+            iconName: ""   // the icon is drawn below so it can rotate
             tooltipText: "Check for updates"
-            enabled: !MiseService.checking && !MiseService.busy
+            enabled: !pop.checkingShown && !MiseService.busy
+            opacity: enabled || active ? 1.0 : 0.5
+            radius: active ? height / 2 : Theme.cornerRadius
+            border.width: 1
+            border.color: Theme.withAlpha(Theme.primary, hovered ? 0.3 : 0.15)
+            scale: pressed ? 0.92 : (hovered && enabled ? 1.05 : 1.0)
+            onEntered: hovered = true
+            onExited: hovered = false
             onClicked: MiseService.refresh()
+
+            Behavior on scale {
+                NumberAnimation {
+                    duration: Theme.shortDuration
+                    easing.type: Easing.OutQuad
+                }
+            }
+            // radius already animates via StyledRect's own Behavior
+            Behavior on border.color {
+                ColorAnimation {
+                    duration: Theme.popoutAnimationDuration
+                }
+            }
+
+            DankIcon {
+                anchors.centerIn: parent
+                name: "refresh"
+                size: refreshBtn.iconSize
+                color: Theme.primary
+                smoothTransform: true
+                visible: !refreshBtn.active
+                rotation: refreshBtn.hovered && refreshBtn.enabled ? 180 : 0
+
+                Behavior on rotation {
+                    NumberAnimation {
+                        duration: Theme.popoutAnimationDuration
+                        easing.type: Easing.OutBack
+                    }
+                }
+            }
+
+            DankSpinner {
+                anchors.centerIn: parent
+                size: Theme.iconSize - 6
+                color: Theme.primary
+                visible: refreshBtn.active
+            }
         }
     }
 
@@ -518,7 +593,7 @@ Item {
                 if (pop.tab === 0) {
                     if (MiseService.error)
                         return MiseService.error;
-                    if (MiseService.checking)
+                    if (pop.checkingShown)
                         return "Checking for updates…";
                     if (pop.updFilter.trim() !== "" || pop.backend !== "")
                         return "No updates match";
