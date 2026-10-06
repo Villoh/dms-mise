@@ -25,6 +25,9 @@ QtObject {
         function onInstalledChanged() {
             root.poke();
         }
+        function onProjectDataChanged() {
+            root.poke();
+        }
         function onCheckingChanged() {
             root.poke();
         }
@@ -42,6 +45,16 @@ QtObject {
     function poke() {
         if (pluginService)
             pluginService.requestLauncherUpdate(pluginId);
+    }
+
+    // action = kind:tool, or kind:tool<TAB>config-path for a project scope (tool names contain ':')
+    function act(kind, tool, scope) {
+        return kind + ":" + tool + (scope ? "\t" + scope : "");
+    }
+
+    // " · project" next to rows that belong to a project config
+    function where(scope) {
+        return scope ? " · " + MiseService.scopeLabel(scope) : "";
     }
 
     function getItems(query) {
@@ -62,16 +75,16 @@ QtObject {
         out.forEach(t => items.push({
                 name: "Upgrade " + t.name,
                 icon: "material:upgrade",
-                comment: t.current + " → " + t.latest,
-                action: "upgrade:" + t.name,
+                comment: t.current + " → " + t.latest + where(t.scope),
+                action: act("upgrade", t.name, t.scope),
                 categories: ["mise"]
             }));
 
         MiseService.bumps.filter(t => t.name.toLowerCase().includes(q)).forEach(t => items.push({
                 name: "Bump " + t.name,
                 icon: "material:upgrade",
-                comment: t.current + " → " + t.bump + " · rewrites mise config",
-                action: "bump:" + t.name,
+                comment: t.current + " → " + t.bump + " · rewrites mise config" + where(t.scope),
+                action: act("bump", t.name, t.scope),
                 categories: ["mise"]
             }));
 
@@ -105,17 +118,28 @@ QtObject {
         return items;
     }
 
-    // Tab / right-click on an installed tool -> Remove
+    // Tab / right-click on an install / installed row. Global first, then one entry per followed project:
+    // Remove where the tool is there, Install where it is not.
     function getContextMenuActions(item) {
-        if (!item?.action?.startsWith("installed:"))
+        const a = item?.action || "";
+        if (!a.startsWith("installed:") && !a.startsWith("install:"))
             return [];
-        const tool = item.action.substring(10);
-        return [{
-                icon: "delete",
-                text: "Remove " + tool,
+        const tool = a.substring(a.indexOf(":") + 1);
+        const out = [];
+        [""].concat(MiseService.scopes).forEach(s => {
+            const here = s ? tool in MiseService.toolsIn(s) : MiseService.installed.includes(tool);
+            const loc = s ? " in " + MiseService.scopeLabel(s) : (MiseService.scopes.length ? " globally" : "");
+            // plain `Install` stays the main action of install rows; the menu only adds the project ones
+            if (!here && !s && a.startsWith("install:"))
+                return;
+            out.push({
+                icon: here ? "delete" : "download",
+                text: (here ? "Remove " : "Install ") + tool + loc,
                 closeLauncher: true,
-                action: () => MiseService.uninstall(tool)
-            }];
+                action: () => here ? MiseService.uninstall(tool, s) : MiseService.install(tool, s)
+            });
+        });
+        return out;
     }
 
     function executeItem(item) {
@@ -123,14 +147,16 @@ QtObject {
             return;
         const i = item.action.indexOf(":");
         const kind = item.action.substring(0, i);
-        const tool = item.action.substring(i + 1);
+        const rest = item.action.substring(i + 1).split("\t");
+        const tool = rest[0];
+        const scope = rest[1] || "";
         if (kind === "refresh")
             MiseService.refresh();
         else if (kind === "bump")
-            MiseService.bump(tool);
+            MiseService.bump(tool, scope);
         else if (kind === "upgrade")
-            MiseService.upgrade(tool);
+            MiseService.upgrade(tool, tool ? scope : undefined);   // no tool = Upgrade all, every scope
         else if (kind === "install")
-            MiseService.install(tool);
+            MiseService.install(tool, scope);
     }
 }
