@@ -71,17 +71,30 @@ Item {
         const bare = raw.replace(/\[.*\]$/, "").replace(/@[^/@:]*$/, "");
         const base = bare.toLowerCase();
         const c = raw.indexOf(":");
+        const b = c > 0 ? base.substring(0, c) : "";
+        const term = c > 0 ? base.substring(c + 1) : base;
         const reg = registry.find(r => r.name === base);
+        // plain `backend:name` that a remote hit matches: fold the hit into the direct row (canonical
+        // name, description) instead of listing the same package twice. crates.io treats - and _ alike.
+        const same = (x, y) => x === y || (b === "cargo" && x.replace(/_/g, "-") === y.replace(/_/g, "-"));
+        const exact = remoteSearch && b && raw === bare ? remote.find(r => r.backend === b && same(r.name.toLowerCase(), base)) : null;
         // `backend:tool`, `backend:tool@ver`, `backend:tool[opt=val]` or `registryname@ver`
         // -> passed to `mise use` as typed. Pinned/optioned entries are never "installed":
         // they (re)configure the tool.
         if (!raw.endsWith("@") && ((c > 0 && c < raw.length - 1) || (reg && bare !== raw))) {
-            const v = verified[bare];
+            // a hit proves the package exists, even when the exact-name check said 404 (npm and gem
+            // names are case-sensitive: `npm:Playwright` is not found, `npm:playwright` is)
+            const vf = verified[bare];
+            const v = exact ? {
+                ok: true,
+                desc: exact.desc || (vf && vf.desc) || ""
+            } : vf;
+            const name = exact ? exact.name : raw;
             const note = v ? (v.ok ? " · ✓" + (v.desc ? " " + v.desc : "") : " · ✗ not found") : "";
             out.push({
-                name: raw,
+                name: name,
                 backend: (isInstalled(bare) && bare !== raw ? "re-pin " + bare + " (now " + (versions[bare] || "?") + ")" : "direct · " + (c > 0 ? raw.substring(0, c) : reg.backend)) + note,
-                installed: raw === bare && isInstalled(raw),
+                installed: raw === bare && isInstalled(name),
                 direct: true
             });
         }
@@ -97,8 +110,6 @@ Item {
                 }));
         // remote hits for what is being typed: free text -> backends marked `free`, `backend:q` -> that one.
         // Older hits that still match stay visible while the next request is in flight.
-        const b = c > 0 ? base.substring(0, c) : "";
-        const term = c > 0 ? base.substring(c + 1) : base;
         const cap = b ? maxPrefixed : maxFree;   // per backend
         const seen = {};
         if (remoteSearch && term)
@@ -121,7 +132,10 @@ Item {
     readonly property var searchers: ({
             npm: {
                 free: true,
-                url: (t, n) => "https://registry.npmjs.org/-/v1/search?size=" + n + "&text=" + encodeURIComponent(t),
+                // lowercase: npm ranks case-sensitively (`Playwright` does not list `playwright` in the top 5)
+                // and new package names are always lowercase. Legacy `JSONStream`-style names are still
+                // found by typing them exactly (exact-name check).
+                url: (t, n) => "https://registry.npmjs.org/-/v1/search?size=" + n + "&text=" + encodeURIComponent(t.toLowerCase()),
                 parse: j => (j.objects || []).map(o => ({
                             name: o.package.name,
                             desc: o.package.description
