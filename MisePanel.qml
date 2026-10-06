@@ -769,10 +769,10 @@ Item {
                 readonly property bool open: pop.openRow === key
                 readonly property var info: MiseService.info[MiseService.bareName(modelData.name)] || ({})
                 readonly property var unused: MiseService.prunable[MiseService.bareName(modelData.name)] || []
-                // the latest versions, plus installed ones too old to be among them (so they can be removed)
+                // `latest` first, then the latest versions, plus installed ones too old to be among them (so they can be removed)
                 readonly property var chipVersions: {
                     const v = info.versions || [];
-                    return v.concat(((info.meta || {}).installed_versions || []).filter(x => !v.includes(x)));
+                    return (v.length ? ["latest"] : []).concat(v, ((info.meta || {}).installed_versions || []).filter(x => !v.includes(x)));
                 }
                 property bool pruneArmed: false   // prune is two-step, like remove
                 width: ListView.view ? ListView.view.width : 0
@@ -859,7 +859,7 @@ Item {
                     iconName: modelData.installed ? (row.confirm ? "check" : "delete") : "download"
                     iconColor: modelData.installed ? (row.confirm ? Theme.surface : Theme.error) : Theme.primary
                     backgroundColor: row.confirm ? Theme.error : "transparent"
-                    tooltipText: modelData.installed ? (row.confirm ? "Click again to remove" : "Remove" + MiseService.inLabel(modelData.scope)) : "Install" + (pop.target ? MiseService.inLabel(pop.target) : "")
+                    tooltipText: modelData.installed ? (row.confirm ? "Click again to remove" : "Remove" + MiseService.inLabel(modelData.scope)) : "Install latest" + (pop.target ? MiseService.inLabel(pop.target) : "")
                     enabled: !MiseService.busy
                     onClicked: {
                         if (!modelData.installed) {
