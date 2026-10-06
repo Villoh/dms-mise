@@ -38,6 +38,17 @@ PluginSettings {
         defaultValue: "30"
     }
 
+    SelectionSetting {
+        settingKey: "panelMode"
+        label: "Keybind panel"
+        description: "What `dms ipc call mise toggle` opens. Overlay: centered over everything, closes on click outside, drag the header to move it. Window: a real window, so the border and rounding come from your compositor config, and it moves and resizes natively."
+        options: [
+            {label: "Overlay", value: "modal"},
+            {label: "Window", value: "window"}
+        ]
+        defaultValue: "modal"
+    }
+
     ToggleSetting {
         settingKey: "showBumps"
         label: "Show pinned / major updates"

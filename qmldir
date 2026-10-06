@@ -1,1 +1,2 @@
 singleton MiseService 1.0 MiseService.qml
+MisePanel 1.0 MisePanel.qml
