@@ -28,6 +28,15 @@ QtObject {
         function onCheckingChanged() {
             root.poke();
         }
+        function onRemoteChanged() {
+            root.poke();
+        }
+        function onVerifiedChanged() {
+            root.poke();
+        }
+        function onLookingUpChanged() {
+            root.poke();
+        }
     }
 
     function poke() {
@@ -38,6 +47,7 @@ QtObject {
     function getItems(query) {
         const raw = (query || "").trim();   // search() needs the original case: github:Owner/Repo, [opts]
         const q = raw.toLowerCase();
+        MiseService.lookup(raw);   // debounced npm / crates.io / GitHub lookup; results arrive via onRemoteChanged
         const items = [];
         const out = MiseService.outdated.filter(t => t.name.toLowerCase().includes(q));
 
@@ -72,6 +82,14 @@ QtObject {
                 action: (r.installed ? "installed:" : "install:") + r.name,
                 categories: ["mise"]
             }));
+        if (q && MiseService.lookingUp)
+            items.push({
+                name: "Searching npm, crates.io…",
+                icon: "material:sync",
+                comment: "remote results appear here",
+                action: "noop:",
+                categories: ["mise"]
+            });
         // nothing pending and no query: an empty list reads as "broken", so say what is going on
         if (!q && items.length === 0)
             items.push({

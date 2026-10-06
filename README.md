@@ -81,9 +81,19 @@ They are written to the config as an inline table and kept on updates. Text is p
 
 Pin a version with `@`: `ripgrep@14.0.3` or `pipx:package@1.2`. The version part is *not* a prefix filter, it is what `mise use` writes, so `@14.0.3` pins exactly and `@14` follows the latest 14.x. (The separator is `@`, not `:`.) Entries with a version or options always show as installable, even if the tool is already installed, so you can re-pin or reconfigure it.
 
+### Live search and verification
+
+Beyond the registry, typing in Tools (or the launcher) also queries the package sites, debounced (350 ms, 3+ characters):
+
+- **free text**: registry (12) plus npm and crates.io (5 each), shown as `npm:name` / `cargo:name` with the description
+- **`backend:q`**: that backend only, up to 15 hits. Searchable: `npm`, `cargo`, `github` (no `/`), `gem`, `dotnet`. Other backends are not searched freely so plain text does not drown in results (GitHub also allows only 10 searches a minute unauthenticated)
+- a typed `backend:tool` is checked against the site: `✓ description` or `✗ not found`. Verified: `npm`, `cargo`, `pipx`/`pypi`, `gem`, `conda` (conda-forge), `dotnet`, `go` (module path), `aqua`, `github`, `ubi`, `spm`, `gitlab` (`owner/repo`). A hint only, Enter still installs (private registries)
+
+No search for `pipx` (PyPI has no search API), `go`, `aqua`, `gitlab` (search is unranked noise), `conda`, `ubi`, `spm`, `http`, `s3`, `asdf`, `vfox`: exact name only, or use the registry. GitHub `owner/repo` checks use the unauthenticated API (60/hour); a rate-limited answer just shows no ✓/✗. Turn all of this off in Settings (*Live search and verification*): only the registry is used and nothing you type leaves your machine.
+
 ## Settings
 
-Settings → Plugins → mise: check interval (15 min, 30 min, 1 h, 4 h, daily). Default 30 min.
+Settings → Plugins → mise: check interval (15 min, 30 min, 1 h, 4 h, daily). Default 30 min. Also: keybind panel mode and tab, pinned/major updates, live search toggle.
 
 ## What it runs
 
@@ -91,6 +101,7 @@ Settings → Plugins → mise: check interval (15 min, 30 min, 1 h, 4 h, daily).
 | --- | --- |
 | Check | `mise outdated --json`, `mise outdated --bump --json`, `mise ls --json` |
 | Registry | `mise registry` (once, at load) |
+| Live search | `curl` to registry.npmjs.org, crates.io, api.github.com, pypi.org (only while typing, see above) |
 | Update | `mise upgrade --yes [tool]` |
 | Bump | `mise upgrade --bump --yes <tool>` |
 | Install | `mise use --global --yes <tool>` |
