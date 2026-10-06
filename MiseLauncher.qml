@@ -25,6 +25,9 @@ QtObject {
         function onInstalledChanged() {
             root.poke();
         }
+        function onCheckingChanged() {
+            root.poke();
+        }
     }
 
     function poke() {
@@ -33,7 +36,8 @@ QtObject {
     }
 
     function getItems(query) {
-        const q = (query || "").trim().toLowerCase();
+        const raw = (query || "").trim();   // search() needs the original case: github:Owner/Repo, [opts]
+        const q = raw.toLowerCase();
         const items = [];
         const out = MiseService.outdated.filter(t => t.name.toLowerCase().includes(q));
 
@@ -61,13 +65,22 @@ QtObject {
                 categories: ["mise"]
             }));
 
-        MiseService.search(q).forEach(r => items.push({
+        MiseService.search(raw).forEach(r => items.push({
                 name: (r.installed ? "Installed: " : "Install ") + r.name,
                 icon: "material:" + (r.installed ? "check_circle" : "download"),
-                comment: r.backend,
+                comment: r.installed ? (MiseService.versions[r.name] || "") + " · Tab to remove" : r.backend,
                 action: (r.installed ? "installed:" : "install:") + r.name,
                 categories: ["mise"]
             }));
+        // nothing pending and no query: an empty list reads as "broken", so say what is going on
+        if (!q && items.length === 0)
+            items.push({
+                name: MiseService.checking ? "Checking for updates…" : "All tools are up to date",
+                icon: "material:" + (MiseService.checking ? "sync" : "check_circle"),
+                comment: MiseService.installed.length + " installed · type a name or backend:tool to install · Enter to re-check",
+                action: "refresh:",
+                categories: ["mise"]
+            });
         return items;
     }
 
@@ -90,7 +103,9 @@ QtObject {
         const i = item.action.indexOf(":");
         const kind = item.action.substring(0, i);
         const tool = item.action.substring(i + 1);
-        if (kind === "bump")
+        if (kind === "refresh")
+            MiseService.refresh();
+        else if (kind === "bump")
             MiseService.bump(tool);
         else if (kind === "upgrade")
             MiseService.upgrade(tool);

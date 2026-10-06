@@ -2,7 +2,7 @@
 
 Install, update and remove [mise](https://mise.jdx.dev) tools from DMS.
 
-Composite plugin: a **DankBar widget** and a **launcher** (`mise` trigger).
+Composite plugin: a **DankBar widget**, a **keybind panel** (same UI, no bar needed) and a **launcher** (`mise` trigger).
 
 | Updates | Tools |
 | :---: | :---: |
@@ -21,6 +21,39 @@ Click it for the popout:
 Each update row can be **skipped** (`skip_next`: that target version only, it shows again when a newer one appears) or **ignored** (`visibility_off`: the tool, whatever the version). Ignored items are not counted in the badge and are left out of *Update all*, *Bump all* and the launcher. The `ignored N` chip lists them with an undo button. Also listed, with undo and *Clear all*, in Settings → Plugins → mise. Stored in the plugin state (`~/.local/state/DankMaterialShell/plugins/mise_state.json`), not in your mise config. Handy for a release that fails to install (e.g. a badly published npm package that `aube` rejects).
 
 Remove is two steps: bin icon, then the red check.
+
+## Keybind panel
+
+A centered panel you can bind to a key, for installing and removing tools. It is the widget's **Tools** tab on its own (updates stay in the widget and the launcher). Two looks, chosen in Settings → Plugins → mise → *Keybind panel*:
+
+- **Overlay** (default): DMS's centered modal. It closes on a click outside, and you can drag the header to move it (double-click recenters; kept until the shell restarts). No compositor border, only DMS's own.
+- **Window**: a real floating window, like DMS's System Monitor. The border and rounding come from your compositor config, and it moves and resizes like any other window (drag the header or use your window-move binding; double-click the header to maximize). Window class `com.danklinux.dms`, title `mise`, if you want a window rule. Tested on Hyprland only; the compositor has to float DMS windows.
+
+In both: the search field is focused on open; Esc, the close button or the same keybind closes it.
+
+```sh
+dms ipc call mise toggle   # also: open, close
+```
+
+Hyprland (Lua config, 0.55+):
+
+```text
+hl.bind("SUPER + CTRL + M", hl.dsp.exec_cmd("dms ipc call mise toggle"))
+```
+
+Hyprland (`hyprland.conf`):
+
+```text
+bind = SUPER CTRL, M, exec, dms ipc call mise toggle
+```
+
+niri:
+
+```text
+Mod+M { spawn "dms" "ipc" "call" "mise" "toggle"; }
+```
+
+Row buttons need the mouse; Enter in the search field installs the first result not yet installed. For a fully keyboard-driven flow use the launcher below.
 
 ## Launcher
 
@@ -82,7 +115,7 @@ ln -s "$PWD" ~/.config/DankMaterialShell/plugins/mise
 dms ipc call plugins reload mise
 ```
 
-`reload` is enough for `MiseBar.qml` / `MiseLauncher.qml`. `MiseService.qml` is a singleton cached through `qmldir`, and `plugin.json` is read at scan time: for those, run `dms restart`. `Qt5Compat` is not available in every DMS install, so the logo is tinted with `QtQuick.Effects` (`MultiEffect` mask) instead.
+`reload` is enough for `MiseBar.qml` / `MiseLauncher.qml` / `MiseDaemon.qml` edits. `MiseService.qml` is a singleton and `MisePanel.qml` is registered, both through `qmldir`, and `plugin.json` is read at scan time: for those, run `dms restart`. `Qt5Compat` is not available in every DMS install, so the logo is tinted with `QtQuick.Effects` (`MultiEffect` mask) instead.
 
 Logo: `assets/mise.svg`, from <https://mise.jdx.dev/logo.svg>.
 
