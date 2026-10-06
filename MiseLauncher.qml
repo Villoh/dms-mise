@@ -84,7 +84,7 @@ QtObject {
             }));
         if (q && MiseService.lookingUp)
             items.push({
-                name: "Searching npm, crates.io…",
+                name: "Searching…",
                 icon: "material:sync",
                 comment: "remote results appear here",
                 action: "noop:",
@@ -99,6 +99,9 @@ QtObject {
                 action: "refresh:",
                 categories: ["mise"]
             });
+        // keep this order: the launcher re-scores plugin items with its own fuzzy match unless they
+        // carry `_preScored` (it would list `dotnet:Avalonia`, the exact hit, seventh)
+        items.forEach((it, i) => it._preScored = 1000 - i);
         return items;
     }
 

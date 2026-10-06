@@ -372,7 +372,7 @@ Item {
                 if (!pop.searching)
                     return "Nothing installed yet.\nType a name, or any backend:tool\ne.g. pipx:package, npm:package, cargo:crate, github:owner/repo\nOptions: pipx:package[uvx_args=--python 3.14]";
                 if (MiseService.lookingUp)
-                    return "Searching npm, crates.io…";
+                    return "Searching…";
                 return MiseService.registry.length ? "No matches. Use backend:tool to install anything else." : "Loading registry…";
             }
         }
