@@ -17,6 +17,7 @@ Item {
     property bool remoteSearch: true  // query npm / crates.io / GitHub as you type (Settings)
     property string lookupQ: ""       // last query handed to lookup()
     property var remoteHits: ({})     // backend -> [{name: "npm:foo", backend, desc}], from the last answer
+    property var pypiTop: null        // [{name, dl}] 15k most downloaded PyPI projects, fetched on the first pipx:/pypi: search
     readonly property var remote: Object.keys(searchers).reduce((a, k) => a.concat(remoteHits[k] || []), [])
     property var verified: ({})       // "npm:foo" -> {ok, desc}; absent = not checked yet / network error
     // debounce pending or a request in flight: UIs show a "searching" hint.
@@ -76,7 +77,8 @@ Item {
         const reg = registry.find(r => r.name === base);
         // plain `backend:name` that a remote hit matches: fold the hit into the direct row (canonical
         // name, description) instead of listing the same package twice. crates.io treats - and _ alike.
-        const same = (x, y) => x === y || (b === "cargo" && x.replace(/_/g, "-") === y.replace(/_/g, "-"));
+        const norm = b === "cargo" ? x => x.replace(/_/g, "-") : (b === "pipx" || b === "pypi") ? x => x.replace(/[-_.]+/g, "-") : x => x;
+        const same = (x, y) => norm(x) === norm(y);
         const exact = remoteSearch && b && raw === bare ? remote.find(r => r.backend === b && same(r.name.toLowerCase(), base)) : null;
         // `backend:tool`, `backend:tool@ver`, `backend:tool[opt=val]` or `registryname@ver`
         // -> passed to `mise use` as typed. Pinned/optioned entries are never "installed":
@@ -87,7 +89,7 @@ Item {
             const vf = verified[bare];
             const v = exact ? {
                 ok: true,
-                desc: exact.desc || (vf && vf.desc) || ""
+                desc: (vf && vf.ok && vf.desc) || exact.desc || ""
             } : vf;
             const name = exact ? exact.name : raw;
             const note = v ? (v.ok ? " · ✓" + (v.desc ? " " + v.desc : "") : " · ✗ not found") : "";
@@ -171,6 +173,15 @@ Item {
                             }));
                 }
             },
+            // PyPI has no search API: pipx:/pypi: filter the pypiTop list locally (see pypiHits)
+            pipx: {
+                free: false,
+                url: (t, n) => ""
+            },
+            pypi: {
+                free: false,
+                url: (t, n) => ""
+            },
             gem: {
                 free: false,
                 url: (t, n) => "https://rubygems.org/api/v1/search.json?query=" + encodeURIComponent(t),
@@ -225,7 +236,7 @@ Item {
 
     // clear lookingUp once the debounce is over and no request is in flight
     function settle() {
-        lookingUp = remoteSearch && lookupQ.length >= 2 && (lookupTimer.running || verifyFetch.running || Object.keys(searchers).some(k => fetchers[k].running));
+        lookingUp = remoteSearch && lookupQ.length >= 2 && (lookupTimer.running || verifyFetch.running || Object.keys(fetchers).some(k => fetchers[k].running));
     }
 
     // what to ask the network for this query
@@ -246,6 +257,13 @@ Item {
         // `@scope/...` and paths are not search terms
         if (t.length < 3 || /^[@/]|:\/\//.test(t))
             return;
+        if (b === "pipx" || b === "pypi") {
+            if (pypiTop)
+                pypiHits(b, t);
+            else
+                pypiFetch.start("https://hugovk.dev/top-pypi-packages/top-pypi-packages.min.json", t);
+            return;
+        }
         // always ask, even when the registry has the name: skipping would leave the hits of an
         // earlier, shorter query on screen and the list would depend on how you typed
         const n = b ? maxPrefixed : maxFree;
@@ -258,8 +276,33 @@ Item {
         });
     }
 
+    // PyPI names are compared normalized (PEP 503: runs of - _ . are the same)
+    function pypiHits(b, t) {
+        const q = t.toLowerCase().replace(/[-_.]+/g, "-");
+        const score = r => r.name === q ? 0 : r.name.startsWith(q) ? 1 : 2;
+        const n = d => d >= 1e9 ? (d / 1e9).toFixed(1) + "B" : d >= 1e6 ? Math.round(d / 1e6) + "M" : d >= 1e3 ? Math.round(d / 1e3) + "k" : String(d);
+        const m = Object.assign({}, remoteHits);
+        // best match first, then the most downloaded
+        m[b] = pypiTop.filter(r => r.name.includes(q)).sort((x, y) => score(x) - score(y) || y.dl - x.dl).slice(0, maxPrefixed).map(r => ({
+                    name: b + ":" + r.name,
+                    backend: b,
+                    desc: n(r.dl) + " downloads / 30 days"
+                }));
+        remoteHits = m;
+    }
+
     // answer of a search request
     function gotHits(b, status, json, term) {
+        if (b === "pypi-top") {
+            if (status === 200 && json && json.rows) {
+                pypiTop = json.rows.map(r => ({
+                            name: r.project,
+                            dl: r.download_count
+                        }));
+                fetchRemote();   // the query that asked for it is still the one on screen
+            }
+            return;
+        }
         if (status !== 200 || !json)
             return;
         const m = Object.assign({}, remoteHits);
@@ -309,7 +352,7 @@ Item {
                 return;
             }
             want = w;
-            command = ["curl", "-s", "--max-time", "6", "-A", "dms-mise-plugin", "-w", "\n%{http_code}", url];
+            command = ["curl", "-sL", "--max-time", "6", "-A", "dms-mise-plugin", "-w", "\n%{http_code}", url];
             running = true;
         }
         stdout: StdioCollector {
@@ -340,6 +383,10 @@ Item {
         id: verifyFetch
     }
     Fetch {
+        id: pypiFetch
+        backend: "pypi-top"
+    }
+    Fetch {
         id: npmFetch
         backend: "npm"
     }
@@ -364,6 +411,7 @@ Item {
         backend: "dotnet"
     }
     readonly property var fetchers: ({
+            "pypi-top": pypiFetch,
             npm: npmFetch,
             cargo: cargoFetch,
             github: githubFetch,
