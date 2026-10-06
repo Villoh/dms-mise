@@ -117,7 +117,7 @@ Item {
 
     // Backends we can search. `free` = also searched for plain text; the rest only after their
     // prefix, or free text would drown in results (and GitHub allows 10 searches/min unauthenticated).
-    // Not searchable (no usable API): go, aqua, gitlab, ubi, spm, conda, http, s3, asdf, vfox.
+    // Not searchable (no usable API): go, aqua, gitlab, ubi, spm, http, s3, asdf, vfox.
     readonly property var searchers: ({
             npm: {
                 free: true,
@@ -142,6 +142,20 @@ Item {
                             name: o.full_name,
                             desc: o.description
                         }))
+            },
+            // anaconda.org searches every channel at once (up to 100 hits, 1-3 s) and ignores channel
+            // filters: keep conda-forge, the channel mise installs from, best match first
+            conda: {
+                free: false,
+                url: (t, n) => "https://api.anaconda.org/search?name=" + encodeURIComponent(t),
+                parse: (j, t) => {
+                    const q = t.toLowerCase();
+                    const score = n => n === q ? 0 : n.startsWith(q) ? 1 : 2;
+                    return (Array.isArray(j) ? j : []).filter(o => o.owner === "conda-forge").sort((a, b) => score(a.name) - score(b.name) || a.name.length - b.name.length).map(o => ({
+                                name: o.name,
+                                desc: o.summary
+                            }));
+                }
             },
             gem: {
                 free: false,
@@ -231,11 +245,11 @@ Item {
     }
 
     // answer of a search request
-    function gotHits(b, status, json) {
+    function gotHits(b, status, json, term) {
         if (status !== 200 || !json)
             return;
         const m = Object.assign({}, remoteHits);
-        m[b] = searchers[b].parse(json).slice(0, maxPrefixed).map(h => ({
+        m[b] = searchers[b].parse(json, term).slice(0, maxPrefixed).map(h => ({
                     name: b + ":" + h.name,
                     backend: b,
                     desc: h.desc || ""
@@ -293,7 +307,7 @@ Item {
                 } catch (e) {}
                 const s = parseInt(text.substring(i + 1)) || 0;
                 if (f.backend)
-                    root.gotHits(f.backend, s, j);
+                    root.gotHits(f.backend, s, j, f.want);
                 else
                     root.gotVerify(f.want, s, j);
             }
@@ -324,6 +338,10 @@ Item {
         backend: "github"
     }
     Fetch {
+        id: condaFetch
+        backend: "conda"
+    }
+    Fetch {
         id: gemFetch
         backend: "gem"
     }
@@ -335,6 +353,7 @@ Item {
             npm: npmFetch,
             cargo: cargoFetch,
             github: githubFetch,
+            conda: condaFetch,
             gem: gemFetch,
             dotnet: dotnetFetch
         })
