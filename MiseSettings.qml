@@ -68,6 +68,13 @@ PluginSettings {
         defaultValue: true
     }
 
+    ToggleSetting {
+        settingKey: "remoteSearch"
+        label: "Live search and verification"
+        description: "While you type in Tools / the launcher, query npm and crates.io (gem, dotnet and GitHub after their `backend:` prefix) and check that a typed `backend:tool` exists. Sends what you type to those sites. Off = registry only."
+        defaultValue: true
+    }
+
     // Ignored updates (skipped versions / ignored tools). Same list as the `ignored N` chip in the popout.
     Column {
         id: ignoredSection

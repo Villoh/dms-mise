@@ -39,6 +39,9 @@ Item {
         return " · checked " + (m < 1 ? "just now" : m + "m ago");
     }
     readonly property bool searching: tab === 1 && query.trim() !== ""
+    // remote lookup only while the Tools tab is being searched
+    onQueryChanged: MiseService.lookup(tab === 1 ? query : "")
+    onTabChanged: MiseService.lookup(tab === 1 ? query : "")
     // in-range updates first, then bump-only (pinned / newer major) rows
     readonly property var updRows: MiseService.outdated.map(t => ({
                 name: t.name,
@@ -203,6 +206,37 @@ Item {
         }
     }
 
+    // thin sliding bar under the field while npm / crates.io / GitHub are being asked
+    Rectangle {
+        id: loadBar
+        anchors.left: field.left
+        anchors.right: field.right
+        anchors.top: field.bottom
+        anchors.topMargin: 1
+        height: 2
+        color: "transparent"
+        clip: true
+        visible: pop.tab === 1 && MiseService.lookingUp
+
+        Rectangle {
+            id: seg
+            width: parent.width / 3
+            height: parent.height
+            radius: 1
+            color: Theme.primary
+            SequentialAnimation on x {
+                running: loadBar.visible
+                loops: Animation.Infinite
+                NumberAnimation {
+                    from: -seg.width
+                    to: loadBar.width
+                    duration: 900
+                    easing.type: Easing.InOutQuad
+                }
+            }
+        }
+    }
+
     DankButton {
         id: updAll
         visible: pop.tab === 0
@@ -337,6 +371,8 @@ Item {
                 }
                 if (!pop.searching)
                     return "Nothing installed yet.\nType a name, or any backend:tool\ne.g. pipx:package, npm:package, cargo:crate, github:owner/repo\nOptions: pipx:package[uvx_args=--python 3.14]";
+                if (MiseService.lookingUp)
+                    return "Searching…";
                 return MiseService.registry.length ? "No matches. Use backend:tool to install anything else." : "Loading registry…";
             }
         }
