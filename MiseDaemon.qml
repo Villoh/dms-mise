@@ -61,7 +61,7 @@ PluginComponent {
         }
     }
 
-    // header (drag area, maximize, close) + the shared Tools panel
+    // header (drag area, maximize, close) + the shared Updates / Tools panel
     component Body: FocusScope {
         id: body
 
@@ -77,7 +77,10 @@ PluginComponent {
 
         focus: true
         Keys.onEscapePressed: body.closeRequested()
-        Component.onCompleted: Qt.callLater(panel.focusSearch)
+        Component.onCompleted: {
+            panel.pickInitialTab();
+            Qt.callLater(panel.focusSearch);
+        }
 
         Item {
             id: header
@@ -149,7 +152,6 @@ PluginComponent {
 
         MisePanel {
             id: panel
-            toolsOnly: true
             x: Theme.spacingL
             y: header.y + header.height + Theme.spacingM
             width: parent.width - Theme.spacingL * 2
@@ -168,8 +170,10 @@ PluginComponent {
         visible: false
 
         onClosed: win.visible = false
-        onVisibleChanged: if (visible)
-            Qt.callLater(winBody.panel.focusSearch)
+        onVisibleChanged: if (visible) {
+            winBody.panel.pickInitialTab();
+            Qt.callLater(winBody.panel.focusSearch);
+        }
 
         Body {
             id: winBody

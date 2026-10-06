@@ -6,9 +6,6 @@ import qs.Widgets
 Item {
     id: pop
 
-    // tools-only: no Updates tab / refresh button (the keybind panel; updates live in the widget and launcher)
-    property bool toolsOnly: false
-
     readonly property int count: MiseService.outdated.length
     readonly property int bumpCount: MiseService.bumps.length
 
@@ -19,13 +16,18 @@ Item {
     readonly property real iconBtn: Theme.iconSize + Theme.spacingM
     readonly property real actionIcon: Theme.iconSize - Theme.spacingXS
 
-    readonly property string summary: toolsOnly ? MiseService.installed.length + " installed" : MiseService.error || ((count > 0 ? count + " outdated" : "All up to date") + (bumpCount ? " · " + bumpCount + " bumpable" : "") + " · " + MiseService.installed.length + " installed" + checkedText)
+    readonly property string summary: MiseService.error || ((count > 0 ? count + " outdated" : "All up to date") + (bumpCount ? " · " + bumpCount + " bumpable" : "") + " · " + MiseService.installed.length + " installed" + checkedText)
+
+    // on open: Updates if something is pending (updates or bumps), Tools otherwise
+    function pickInitialTab() {
+        tab = (count > 0 || bumpCount > 0) ? 0 : 1;
+    }
 
     function focusSearch() {
         field.forceActiveFocus();
     }
 
-    property int tab: toolsOnly ? 1 : 0            // 0 = updates, 1 = tools (installed + install)
+    property int tab: 0            // 0 = updates, 1 = tools (installed + install)
     property string updFilter: ""
     property string query: ""
     property string backend: ""     // backend chip filter ("" = all)
@@ -101,8 +103,7 @@ Item {
     Item {
         id: toolbar
         width: parent.width
-        visible: !pop.toolsOnly
-        height: visible ? pop.controlH : 0
+        height: pop.controlH
 
         DankButtonGroup {
             anchors.left: parent.left
@@ -130,7 +131,7 @@ Item {
     Rectangle {
         id: banner
         anchors.top: toolbar.bottom
-        anchors.topMargin: toolbar.visible ? Theme.spacingS : 0
+        anchors.topMargin: Theme.spacingS
         width: parent.width
         visible: MiseService.busy
         height: visible ? bannerCol.implicitHeight + Theme.spacingM * 2 : 0

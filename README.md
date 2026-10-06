@@ -24,7 +24,7 @@ Remove is two steps: bin icon, then the red check.
 
 ## Keybind panel
 
-A centered panel you can bind to a key, for installing and removing tools. It is the widget's **Tools** tab on its own (updates stay in the widget and the launcher). Two looks, chosen in Settings → Plugins → mise → *Keybind panel*:
+A panel you can bind to a key, with the same **Updates** and **Tools** tabs as the widget's popout. It opens on Updates when something is pending (updates or bumps) and on Tools otherwise. Two looks, chosen in Settings → Plugins → mise → *Keybind panel*:
 
 - **Overlay** (default): DMS's centered modal. It closes on a click outside, and you can drag the header to move it (double-click recenters; kept until the shell restarts). No compositor border, only DMS's own.
 - **Window**: a real floating window, like DMS's System Monitor. The border and rounding come from your compositor config, and it moves and resizes like any other window (drag the header or use your window-move binding; double-click the header to maximize). Window class `com.danklinux.dms`, title `mise`, if you want a window rule. Tested on Hyprland only; the compositor has to float DMS windows.
