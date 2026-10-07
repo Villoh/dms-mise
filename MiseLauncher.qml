@@ -40,6 +40,12 @@ QtObject {
         function onLookingUpChanged() {
             root.poke();
         }
+        function onLastErrorChanged() {
+            root.poke();
+        }
+        function onUncheckedChanged() {
+            root.poke();
+        }
     }
 
     function poke() {
@@ -103,6 +109,14 @@ QtObject {
                 action: "noop:",
                 categories: ["mise"]
             });
+        if (q)
+            MiseService.notices.forEach(n => items.push({
+                    name: n,
+                    icon: "material:cloud_off",
+                    comment: "results from it are missing",
+                    action: "noop:",
+                    categories: ["mise"]
+                }));
         // nothing pending and no query: an empty list reads as "broken", so say what is going on
         if (!q && items.length === 0)
             items.push({

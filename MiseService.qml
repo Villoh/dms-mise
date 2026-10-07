@@ -21,6 +21,21 @@ Item {
     property var remoteHits: ({})     // backend -> [{name: "npm:foo", backend, desc}], from the last answer
     readonly property var remote: Object.keys(searchers).reduce((a, k) => a.concat(remoteHits[k] || []), [])
     property var verified: ({})       // "npm:foo" -> {ok, desc}; absent = not checked yet / network error
+    property var lastError: ({})      // backend -> why its last search failed ("offline", "timeout", "rate limited", "HTTP 500"); cleared by its next 200
+    property var unchecked: ({})      // "npm:foo" -> why the exact-name check failed (anything but 200 / 404)
+    // what to tell the user: one line per reason, only for backends this query searches, and not while
+    // a request is pending (the loading bar / Searching… take that place)
+    readonly property var notices: {
+        if (lookingUp)
+            return [];
+        const by = {};
+        searchTargets(lookupQ).forEach(k => {
+            const e = lastError[k];
+            if (e)
+                (by[e] = by[e] || []).push(k);
+        });
+        return Object.keys(by).map(e => by[e].join(", ") + " didn't answer · " + e);
+    }
     // debounce pending or a request in flight: UIs show a "searching" hint.
     // A plain flag (see settle()), not a binding on Timer.running: restart() flips that false->true on
     // every keystroke and the UI would blink.
@@ -299,7 +314,7 @@ Item {
                 desc: (vf && vf.ok && vf.desc) || exact.desc || ""
             } : vf;
             const name = exact ? exact.name : raw;
-            const note = v ? (v.ok ? " · ✓" + (v.desc ? " " + v.desc : "") : " · ✗ not found") : "";
+            const note = v ? (v.ok ? " · ✓" + (v.desc ? " " + v.desc : "") : " · ✗ not found") : unchecked[bare] ? " · ? could not check (" + unchecked[bare] + ")" : "";
             out.push({
                 name: name,
                 backend: (isInstalled(bare) && bare !== raw ? "re-pin " + bare + " (now " + (toolsHere[bare] || "?") + ")" : (v && v.ok ? "" : "direct · ") + (c > 0 ? raw.substring(0, c) : reg.backend)) + note,
@@ -442,34 +457,48 @@ Item {
         lookingUp = remoteSearch && lookupQ.length >= 2 && (lookupTimer.running || verifyFetch.running || Object.keys(fetchers).some(k => fetchers[k].running));
     }
 
+    // "npm:foo@1[x=y]" -> {bare: "npm:foo", b: "npm", t: "foo"}; free text has b ""
+    function splitQuery(q) {
+        const bare = q.replace(/\[.*\]$/, "").replace(/@[^/@:]*$/, "");
+        const c = bare.indexOf(":");
+        return {
+            bare: bare,
+            b: c > 0 ? bare.substring(0, c) : "",
+            t: c > 0 ? bare.substring(c + 1) : bare
+        };
+    }
+
+    // backends that get a search request for this query
+    function searchTargets(q) {
+        if (!remoteSearch || q.length < 2)
+            return [];
+        const p = splitQuery(q);
+        // `@scope/...` and paths are not search terms
+        if (p.t.length < 3 || /^[@/]|:\/\//.test(p.t))
+            return [];
+        return Object.keys(searchers).filter(k => (p.b ? p.b === k : searchers[k].free) && searchers[k].url(p.t, 1));
+    }
+
     // what to ask the network for this query
     function fetchRemote() {
         const q = lookupQ;
         if (!remoteSearch || q.length < 2)
             return;
-        const bare = q.replace(/\[.*\]$/, "").replace(/@[^/@:]*$/, "");
-        const c = bare.indexOf(":");
-        const b = c > 0 ? bare.substring(0, c) : "";
-        const t = c > 0 ? bare.substring(c + 1) : bare;
+        const {
+            bare,
+            b,
+            t
+        } = splitQuery(q);
         // typed backend:tool -> does it exist? (git+/URL specs are not checked)
         if (t && verifiers[b] && !verified[bare] && !/:\/\/|^git\+/.test(t)) {
             const u = verifiers[b](t);
             if (u)
                 verifyFetch.start(u, bare);
         }
-        // `@scope/...` and paths are not search terms
-        if (t.length < 3 || /^[@/]|:\/\//.test(t))
-            return;
         // always ask, even when the registry has the name: skipping would leave the hits of an
         // earlier, shorter query on screen and the list would depend on how you typed
         const n = b ? maxPrefixed : maxFree;
-        Object.keys(searchers).forEach(k => {
-            if (b ? b !== k : !searchers[k].free)
-                return;
-            const u = searchers[k].url(t, n);
-            if (u)
-                fetchers[k].start(u, t);
-        });
+        searchTargets(q).forEach(k => fetchers[k].start(searchers[k].url(t, n), t));
     }
 
     // searcher for one deps.dev ecosystem; results mix packages and GitHub projects, keep the packages
@@ -484,23 +513,47 @@ Item {
         };
     }
 
-    // answer of a search request
-    function gotHits(b, status, json, term) {
-        if (status !== 200 || !json)
-            return;
+    // why a request failed ("" = 200). remaining = x-ratelimit-remaining header, code = curl's exit code
+    function failure(status, remaining, code) {
+        if (status === 200)
+            return "";
+        if (status === 0)
+            return code === 28 ? "timeout" : "offline";
+        if (status === 429 || (status === 403 && remaining === "0"))
+            return "rate limited";
+        return "HTTP " + status;
+    }
+
+    // answer of a search request. A failed backend loses its hits: older ones would pass as the answer.
+    function gotHits(b, why, json, term) {
+        why = why || (json ? "" : "unexpected answer");
+        const e = Object.assign({}, lastError);
         const m = Object.assign({}, remoteHits);
-        m[b] = searchers[b].parse(json, term).slice(0, maxPrefixed).map(h => ({
-                    name: b + ":" + h.name,
-                    backend: b,
-                    desc: h.desc || ""
-                }));
+        if (why) {
+            e[b] = why;
+            delete m[b];
+        } else {
+            delete e[b];
+            m[b] = searchers[b].parse(json, term).slice(0, maxPrefixed).map(h => ({
+                        name: b + ":" + h.name,
+                        backend: b,
+                        desc: h.desc || ""
+                    }));
+        }
+        lastError = e;
         remoteHits = m;
     }
 
-    // 200 = exists, 404 = does not; anything else (offline, rate limit) stays unknown
-    function gotVerify(tool, status, j) {
-        if (status !== 200 && status !== 404)
+    // 200 = exists, 404 = does not; anything else (offline, rate limit) stays unknown, but is flagged
+    function gotVerify(tool, status, j, why) {
+        const u = Object.assign({}, unchecked);
+        if (status !== 200 && status !== 404) {
+            u[tool] = why;
+            unchecked = u;
             return;
+        }
+        delete u[tool];
+        unchecked = u;
         const info = j ? j.info : null;
         const d = j ? (j.description || (typeof info === "string" ? info : info && info.summary) || j.summary || (j.crate && j.crate.description) || "") : "";
         const v = Object.assign({}, verified);
@@ -521,7 +574,8 @@ Item {
     }
 
     // one curl at a time; a request that arrives meanwhile waits and replaces any older waiting one.
-    // stdout = body + "\n" + http status (000 = network failure). backend "" = verification.
+    // stdout = body + "\n" + "<http status> <curl exit code> <x-ratelimit-remaining>" (status 000 = network failure).
+    // backend "" = verification.
     component Fetch: Process {
         id: f
         property string backend: ""
@@ -535,7 +589,7 @@ Item {
                 return;
             }
             want = w;
-            command = ["curl", "-sL", "--max-time", "6", "-A", "dms-mise-plugin", "-w", "\n%{http_code}", url];
+            command = ["curl", "-sL", "--max-time", "6", "-A", "dms-mise-plugin", "-w", "\n%{http_code} %{exitcode} %header{x-ratelimit-remaining}", url];
             running = true;
         }
         stdout: StdioCollector {
@@ -545,11 +599,13 @@ Item {
                 try {
                     j = JSON.parse(text.substring(0, i));
                 } catch (e) {}
-                const s = parseInt(text.substring(i + 1)) || 0;
+                const tail = text.substring(i + 1).trim().split(" ");
+                const s = parseInt(tail[0]) || 0;
+                const why = root.failure(s, tail[2], parseInt(tail[1]));
                 if (f.backend)
-                    root.gotHits(f.backend, s, j, f.want);
+                    root.gotHits(f.backend, why, j, f.want);
                 else
-                    root.gotVerify(f.want, s, j);
+                    root.gotVerify(f.want, s, j, why);
             }
         }
         onExited: {
