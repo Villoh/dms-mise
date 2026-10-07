@@ -27,7 +27,7 @@ Item {
     property bool tokenAsked: false
     property bool tokenReady: false
     property var lastError: ({})      // backend -> why its last search failed ("offline", "timeout", "rate limited", "HTTP 500"); cleared by its next 200
-    property var unchecked: ({})      // "npm:foo" -> why the exact-name check failed (anything but 200 / 404)
+    property var unchecked: ({})      // "npm:foo" -> why the exact-name check failed (anything but 200 / 404); the row only says "could not check", the reason does not fit
     // what to tell the user: one line per reason, only for backends this query searches, and not while
     // a request is pending (the loading bar / Searching… take that place)
     readonly property var notices: {
@@ -319,7 +319,7 @@ Item {
                 desc: (vf && vf.ok && vf.desc) || exact.desc || ""
             } : vf;
             const name = exact ? exact.name : raw;
-            const note = v ? (v.ok ? " · ✓" + (v.desc ? " " + v.desc : "") : " · ✗ not found") : unchecked[bare] ? " · ? could not check (" + unchecked[bare] + ")" : "";
+            const note = v ? (v.ok ? " · ✓" + (v.desc ? " " + v.desc : "") : " · ✗ not found") : bare in unchecked ? " · ? could not check" : "";
             out.push({
                 name: name,
                 backend: (isInstalled(bare) && bare !== raw ? "re-pin " + bare + " (now " + (toolsHere[bare] || "?") + ")" : (v && v.ok ? "" : "direct · ") + (c > 0 ? raw.substring(0, c) : reg.backend)) + note,
