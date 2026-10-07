@@ -709,9 +709,23 @@ Item {
         }
     }
 
+    // a backend of this query did not answer (the loading bar is gone by then)
+    StyledText {
+        id: notice
+        anchors.top: chips.bottom
+        anchors.topMargin: visible ? Theme.spacingS : 0
+        width: parent.width
+        height: visible ? implicitHeight : 0
+        visible: pop.tab === 1 && MiseService.notices.length > 0
+        text: MiseService.notices.join("\n")
+        color: Theme.warning
+        font.pixelSize: Theme.fontSizeSmall
+        elide: Text.ElideRight
+    }
+
     // ---- lists ----
     Rectangle {
-        anchors.top: chips.bottom
+        anchors.top: notice.bottom
         anchors.topMargin: Theme.spacingS
         anchors.bottom: updAll.visible ? updAll.top : pruneAll.visible ? pruneAll.top : parent.bottom
         anchors.bottomMargin: updAll.visible || pruneAll.visible ? Theme.spacingS : 0
