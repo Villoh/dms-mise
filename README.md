@@ -131,7 +131,7 @@ Turn all of this off in Settings (*Live search and verification*): only the regi
 
 #### GitHub token
 
-GitHub `owner/repo` checks and `github:q` search call `api.github.com`, which allows 60 requests/hour and 10 searches/minute unauthenticated (5000 and 30 with a token). On the first GitHub request the plugin runs `mise token github --raw` once and keeps the result in memory only. If mise has a token (`MISE_GITHUB_TOKEN`, `GITHUB_TOKEN`, `credential_command`, `gh`'s `hosts.yml`, ...), it is sent as `Authorization: Bearer` to `api.github.com` and to no other host, through a curl config on stdin so it never shows in `ps`. No token is fine: requests go unauthenticated, and a rate-limited answer shows `? could not check (rate limited)` instead of ✓/✗. Nothing is looked up or sent while *Live search and verification* is off.
+GitHub `owner/repo` checks and `github:q` search call `api.github.com`, which allows 60 requests/hour and 10 searches/minute unauthenticated (5000 and 30 with a token). On the first GitHub request the plugin runs `mise token github --raw` once and keeps the result in memory only. If mise has a token (`MISE_GITHUB_TOKEN`, `GITHUB_TOKEN`, `credential_command`, `gh`'s `hosts.yml`, ...), it is sent as `Authorization: Bearer` to `api.github.com` and to no other host, through a curl config on stdin so it never shows in `ps`. No token is fine: requests go unauthenticated, and a rate-limited answer shows `? could not check` instead of ✓/✗, and the notice says `github didn't answer · rate limited`. Nothing is looked up or sent while *Live search and verification* is off.
 
 If `gh auth login` keeps its token in the system keyring, mise cannot read it and `mise token github` finds nothing. Tell mise to ask `gh`:
 
