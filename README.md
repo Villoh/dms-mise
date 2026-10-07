@@ -123,11 +123,23 @@ Beyond the registry, typing in Tools (or the launcher) also queries the package 
 - **`backend:q`**: that backend only, up to 15 hits. Searchable: `npm`, `cargo`, `github` (no `/`), `gem`, `dotnet`, `pipx` (`pypi:` is read as `pipx:`, mise has no `pypi` backend) and `go` (see below), `conda` (conda-forge only: anaconda.org searches every channel and takes 1-3 s). Other backends are not searched freely so plain text does not drown in results (GitHub also allows only 10 searches a minute unauthenticated)
 - a typed `backend:tool` is checked against the site: `✓ description` or `✗ not found`. Verified: `npm`, `cargo`, `pipx`/`pypi`, `gem`, `conda` (conda-forge), `dotnet`, `go` (module path), `aqua`, `github`, `ubi`, `spm`, `gitlab` (`owner/repo`). A hint only, Enter still installs (private registries). When a search hit is the same package as what you typed (any capitalization; `-`/`_` for cargo), the two are one row, with the hit's canonical name and description. Entries with `@version` or `[options]` always stay as typed
 
-No search for `aqua`, `gitlab` (search is unranked noise), `ubi`, `spm`, `http`, `s3`, `asdf`, `vfox`: exact name only, or use the registry. GitHub `owner/repo` checks use the unauthenticated API (60/hour); a rate-limited answer shows `? could not check (rate limited)` instead of ✓/✗. PyPI and Go have no search API (PyPI's was disabled in 2021 and `pypi.org/search` sits behind a JavaScript challenge), so `pipx:q`, `pypi:q` and `go:q` use the search behind [deps.dev](https://deps.dev)'s own website (Google's Open Source Insights): a plain JSON endpoint, ranked by relevance, no key. It is **unofficial and undocumented**, so it may change or disappear without notice; if it fails you get the notice below and the exact-name check still works. Rows show the latest version, not a description.
+No search for `aqua`, `gitlab` (search is unranked noise), `ubi`, `spm`, `http`, `s3`, `asdf`, `vfox`: exact name only, or use the registry. PyPI and Go have no search API (PyPI's was disabled in 2021 and `pypi.org/search` sits behind a JavaScript challenge), so `pipx:q`, `pypi:q` and `go:q` use the search behind [deps.dev](https://deps.dev)'s own website (Google's Open Source Insights): a plain JSON endpoint, ranked by relevance, no key. It is **unofficial and undocumented**, so it may change or disappear without notice; if it fails you get the notice below and the exact-name check still works. Rows show the latest version, not a description.
 
 When a search request fails, the Tools tab (a line under the field) and the launcher (an extra last row) say which backend did not answer and why, e.g. `npm didn't answer · offline`. Reasons: `offline`, `timeout`, `rate limited` (`429`, or `403` with an exhausted `x-ratelimit-remaining`), `HTTP 5xx`, `unexpected answer`. That backend's hits are dropped instead of left on screen as if they answered the new query. Only backends the current query searches are mentioned, and the notice goes away as soon as a request to that backend succeeds. A `404` on the exact-name check is a real answer (`✗ not found`); any other failure shows `? could not check (reason)`.
 
 Turn all of this off in Settings (*Live search and verification*): only the registry is used and nothing you type leaves your machine.
+
+#### GitHub token
+
+GitHub `owner/repo` checks and `github:q` search call `api.github.com`, which allows 60 requests/hour and 10 searches/minute unauthenticated (5000 and 30 with a token). On the first GitHub request the plugin runs `mise token github --raw` once and keeps the result in memory only. If mise has a token (`MISE_GITHUB_TOKEN`, `GITHUB_TOKEN`, `credential_command`, `gh`'s `hosts.yml`, ...), it is sent as `Authorization: Bearer` to `api.github.com` and to no other host, through a curl config on stdin so it never shows in `ps`. No token is fine: requests go unauthenticated, and a rate-limited answer shows `? could not check (rate limited)` instead of ✓/✗. Nothing is looked up or sent while *Live search and verification* is off.
+
+If `gh auth login` keeps its token in the system keyring, mise cannot read it and `mise token github` finds nothing. Tell mise to ask `gh`:
+
+```toml
+# ~/.config/mise/config.toml
+[settings.github]
+credential_command = "gh auth token"
+```
 
 ## Settings
 
@@ -140,6 +152,7 @@ Settings → Plugins → mise: check interval (15 min, 30 min, 1 h, 4 h, daily).
 | Check | `mise outdated --json`, `mise outdated --bump --json`, `mise ls --json` (and the same with `-C <project>` per followed project) |
 | Registry | `mise registry` (once, at load) |
 | Live search | `curl` to registry.npmjs.org, crates.io, api.github.com, pypi.org (only while typing, see above) |
+| GitHub token | `mise token github --raw` (once per session, on the first GitHub request) |
 | Update | `mise upgrade --yes [tool]` (`mise -C <project> upgrade ...` for a project) |
 | Bump | `mise upgrade --bump --yes <tool>` (same `-C`) |
 | Install | `mise use --global --yes <tool>`, or `mise use --path <config> --yes <tool>` for a project |

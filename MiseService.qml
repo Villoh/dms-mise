@@ -21,6 +21,11 @@ Item {
     property var remoteHits: ({})     // backend -> [{name: "npm:foo", backend, desc}], from the last answer
     readonly property var remote: Object.keys(searchers).reduce((a, k) => a.concat(remoteHits[k] || []), [])
     property var verified: ({})       // "npm:foo" -> {ok, desc}; absent = not checked yet / network error
+    // token mise resolves for GitHub, only ever sent to api.github.com. Asked on the first GitHub
+    // request, kept in memory (never written anywhere); "" = none, requests go unauthenticated.
+    property string githubToken: ""
+    property bool tokenAsked: false
+    property bool tokenReady: false
     property var lastError: ({})      // backend -> why its last search failed ("offline", "timeout", "rate limited", "HTTP 500"); cleared by its next 200
     property var unchecked: ({})      // "npm:foo" -> why the exact-name check failed (anything but 200 / 404)
     // what to tell the user: one line per reason, only for backends this query searches, and not while
@@ -454,7 +459,7 @@ Item {
 
     // clear lookingUp once the debounce is over and no request is in flight
     function settle() {
-        lookingUp = remoteSearch && lookupQ.length >= 2 && (lookupTimer.running || verifyFetch.running || Object.keys(fetchers).some(k => fetchers[k].running));
+        lookingUp = remoteSearch && lookupQ.length >= 2 && (lookupTimer.running || (tokenAsked && !tokenReady) || verifyFetch.running || Object.keys(fetchers).some(k => fetchers[k].running));
     }
 
     // "npm:foo@1[x=y]" -> {bare: "npm:foo", b: "npm", t: "foo"}; free text has b ""
@@ -511,6 +516,50 @@ Item {
                             desc: r.defaultVersion ? "latest " + r.defaultVersion : ""
                         }))
         };
+    }
+
+    function isGithub(url) {
+        return url.startsWith("https://api.github.com/");
+    }
+
+    function resolveToken() {
+        if (tokenAsked)
+            return;
+        tokenAsked = true;
+        tokenProc.running = true;
+        tokenTimeout.start();
+    }
+
+    // plain token characters only: it goes into a curl config line
+    function tokenDone(t) {
+        if (tokenReady)
+            return;
+        tokenReady = true;
+        githubToken = /^[\w.\-]+$/.test(t) ? t : "";
+        verifyFetch.next();
+        Object.keys(fetchers).forEach(k => fetchers[k].next());
+        settle();
+    }
+
+    // `timeout` only kills mise itself: a hung child (e.g. credential_command) would keep the pipe open
+    // and every GitHub request waiting. Give up on the token instead.
+    Timer {
+        id: tokenTimeout
+        interval: 6000
+        onTriggered: {
+            tokenProc.running = false;
+            root.tokenDone("");
+        }
+    }
+
+    // `mise token github --raw` (every source mise knows). Capped at 5 s: it may try an interactive
+    // OAuth flow. Nothing or `(none)` = no token.
+    Process {
+        id: tokenProc
+        command: ["sh", "-c", "timeout 5 mise token github --raw 2>/dev/null"]
+        stdout: StdioCollector {
+            onStreamFinished: root.tokenDone(text.trim())
+        }
     }
 
     // why a request failed ("" = 200). remaining = x-ratelimit-remaining header, code = curl's exit code
@@ -576,21 +625,42 @@ Item {
     // one curl at a time; a request that arrives meanwhile waits and replaces any older waiting one.
     // stdout = body + "\n" + "<http status> <curl exit code> <x-ratelimit-remaining>" (status 000 = network failure).
     // backend "" = verification.
+    // api.github.com requests wait for the token lookup and carry it as a header read from a curl
+    // config on stdin (-K), so it never shows in the argv `ps` lists. Other hosts never see it.
     component Fetch: Process {
         id: f
         property string backend: ""
         property string want: ""
+        property bool authed: false
         property string waitUrl: ""
         property string waitWant: ""
+        stdinEnabled: true
         function start(url, w) {
-            if (running) {
+            const gh = root.isGithub(url);
+            if (running || (gh && !root.tokenReady)) {
                 waitUrl = url;
                 waitWant = w;
+                if (gh)
+                    root.resolveToken();
                 return;
             }
             want = w;
-            command = ["curl", "-sL", "--max-time", "6", "-A", "dms-mise-plugin", "-w", "\n%{http_code} %{exitcode} %header{x-ratelimit-remaining}", url];
+            authed = gh && root.githubToken !== "";
+            const curl = ["curl", "-sL", "--max-time", "6", "-A", "dms-mise-plugin", "-w", "\n%{http_code} %{exitcode} %header{x-ratelimit-remaining}"];
+            command = authed ? ["bash", "-c", "IFS= read -r t; exec " + curl.map(a => "'" + a + "'").join(" ") + " -K <(printf 'header = \"Authorization: Bearer %s\"\\n' \"$t\") \"$1\"", "_", url] : curl.concat([url]);
             running = true;
+        }
+        // the request that arrived while busy or while the token was being looked up
+        function next() {
+            if (!waitUrl || running)
+                return;
+            const u = waitUrl, w = waitWant;
+            waitUrl = "";
+            start(u, w);
+        }
+        onStarted: {
+            if (authed)
+                write(root.githubToken + "\n");
         }
         stdout: StdioCollector {
             onStreamFinished: {
@@ -609,11 +679,7 @@ Item {
             }
         }
         onExited: {
-            if (waitUrl) {
-                const u = waitUrl, w = waitWant;
-                waitUrl = "";
-                start(u, w);
-            }
+            next();
             root.settle();
         }
     }
