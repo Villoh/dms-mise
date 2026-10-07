@@ -19,7 +19,7 @@
   },
   "settings": "./MiseSettings.qml",
   "trigger": "mise",
-  "requires_dms": ">=1.6.2",
+  "requires_dms": ">=1.5.0",
   "permissions": [
     "process",
     "settings_read",

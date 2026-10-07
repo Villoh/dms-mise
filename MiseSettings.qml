@@ -9,6 +9,9 @@ PluginSettings {
     id: root
     pluginId: "mise"
 
+    // Window mode needs DankFloatingWindow (DMS 1.6.0+); MiseWindow.qml does not compile without it
+    readonly property bool windowSupported: Qt.createComponent(Qt.resolvedUrl("MiseWindow.qml")).status !== Component.Error
+
     StyledText {
         width: parent.width
         text: "mise"
@@ -57,14 +60,15 @@ PluginSettings {
     SelectionSetting {
         settingKey: "panelMode"
         label: "Keybind panel"
-        description: "What `dms ipc call mise toggle` opens. Overlay: centered over everything, closes on click outside, drag the header to move it. Window: a real window, so the border and rounding come from your compositor config, and it moves and resizes natively."
+        description: "What `dms ipc call mise toggle` opens. Overlay: centered over everything, closes on click outside, drag the header to move it. Window: a real window, so the border and rounding come from your compositor config, and it moves and resizes natively." + (root.windowSupported ? "" : " Window needs DMS 1.6.0 or newer; the overlay is used until you update.")
+        enabled: root.windowSupported
         options: [
             {
                 label: "Overlay",
                 value: "modal"
             },
             {
-                label: "Window",
+                label: root.windowSupported ? "Window" : "Window (needs DMS 1.6.0+)",
                 value: "window"
             }
         ]

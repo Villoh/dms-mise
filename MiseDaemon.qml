@@ -4,21 +4,23 @@ import qs.Common
 import qs.Modals.Common
 import qs.Modules.Plugins
 import qs.Services
-import qs.Widgets
 
 // Keybind panel:  dms ipc call mise toggle   (also: open, close)
 // Two surfaces, picked in Settings -> "Keybind panel":
 //   modal (default): DMS overlay, centered, closes on click outside; drag the header to move it.
 //   window:          a real floating window like DMS's System Monitor. The compositor draws the
 //                    border and rounding from your config; it moves and resizes natively.
+//                    Needs DMS 1.6.0+ (DankFloatingWindow); on older versions the overlay is used.
 PluginComponent {
     id: root
 
-    readonly property bool windowMode: root.pluginData?.panelMode === "window"
+    // MiseWindow.qml only compiles on DMS 1.6.0+, where DankFloatingWindow exists
+    readonly property bool windowSupported: winLoader.status === Loader.Ready
+    readonly property bool windowMode: windowSupported && root.pluginData?.panelMode === "window"
     readonly property string startTab: root.pluginData?.panelTab ?? "auto"
     readonly property real panelW: Math.round(Theme.fontSizeMedium * 34)
     readonly property real panelH: Math.round(Theme.fontSizeMedium * 46)
-    readonly property bool shown: windowMode ? win.visible : modal.shouldBeVisible
+    readonly property bool shown: windowMode ? winLoader.item.visible : modal.shouldBeVisible
 
     // modal only: where the user dragged it (kept until the shell restarts)
     property bool moved: false
@@ -29,7 +31,7 @@ PluginComponent {
     function open() {
         if (windowMode) {
             MiseService.refresh();
-            win.visible = true;
+            winLoader.item.visible = true;
             return "opened";
         }
         const screen = CompositorService.getFocusedScreen();
@@ -42,7 +44,8 @@ PluginComponent {
     }
 
     function close() {
-        win.visible = false;
+        if (winLoader.item)
+            winLoader.item.visible = false;
         if (modal.shouldBeVisible)
             modal.close();
         return "closed";
@@ -62,137 +65,14 @@ PluginComponent {
         }
     }
 
-    // header (drag area, maximize, close) + the shared Updates / Tools panel
-    component Body: FocusScope {
-        id: body
-
-        property string startTab: "auto"
-        property bool canMaximize: false
-        property bool maximized: false
-        property alias panel: panel
-
-        signal headerPressed(var scene)
-        signal headerMoved(var scene)
-        signal headerDoubleClicked
-        signal maximizeRequested
-        signal closeRequested
-
-        focus: true
-        Keys.onEscapePressed: body.closeRequested()
-        Component.onCompleted: {
-            panel.pickInitialTab(body.startTab);
-            Qt.callLater(panel.focusSearch);
-        }
-
-        Item {
-            id: header
-            x: Theme.spacingL
-            y: Theme.spacingL
-            width: parent.width - Theme.spacingL * 2
-            height: Math.max(titleCol.implicitHeight, buttons.height)
-
-            MouseArea {
-                id: grip
-                anchors.left: parent.left
-                anchors.right: buttons.left
-                height: parent.height
-                cursorShape: Qt.SizeAllCursor
-                onPressed: m => body.headerPressed(grip.mapToItem(null, m.x, m.y))
-                onPositionChanged: m => {
-                    if (pressed)
-                        body.headerMoved(grip.mapToItem(null, m.x, m.y));
-                }
-                onDoubleClicked: body.headerDoubleClicked()
-            }
-
-            Column {
-                id: titleCol
-                anchors.left: parent.left
-                anchors.right: buttons.left
-                anchors.rightMargin: Theme.spacingM
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Theme.spacingXXS
-                enabled: false   // clicks fall through to the drag area
-                StyledText {
-                    text: "mise"
-                    font.pixelSize: Theme.fontSizeLarge
-                    font.weight: Font.Bold
-                    color: Theme.surfaceText
-                }
-                StyledText {
-                    width: parent.width
-                    text: panel.summary
-                    font.pixelSize: Theme.fontSizeSmall
-                    color: Theme.surfaceVariantText
-                    elide: Text.ElideRight
-                    wrapMode: Text.NoWrap
-                    maximumLineCount: 1
-                }
-            }
-
-            Row {
-                id: buttons
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Theme.spacingXS
-
-                DankActionButton {
-                    visible: body.canMaximize
-                    iconName: body.maximized ? "fullscreen_exit" : "fullscreen"
-                    iconSize: Theme.iconSize - Theme.spacingXS
-                    iconColor: Theme.surfaceText
-                    onClicked: body.maximizeRequested()
-                }
-
-                DankActionButton {
-                    iconName: "close"
-                    iconSize: Theme.iconSize - Theme.spacingXS
-                    iconColor: Theme.surfaceText
-                    onClicked: body.closeRequested()
-                }
-            }
-        }
-
-        MisePanel {
-            id: panel
-            x: Theme.spacingL
-            y: header.y + header.height + Theme.spacingM
-            width: parent.width - Theme.spacingL * 2
-            height: parent.height - y - Theme.spacingL
-        }
-    }
-
     // ---- window mode ----
-    DankFloatingWindow {
-        id: win
-        objectName: "miseWindow"
-        title: "mise"
-        minimumSize: Qt.size(Math.round(Theme.fontSizeMedium * 28), Math.round(Theme.fontSizeMedium * 30))
-        implicitWidth: root.panelW
-        implicitHeight: root.panelH
-        visible: false
-
-        onClosed: win.visible = false
-        onVisibleChanged: if (visible) {
-            winBody.panel.pickInitialTab(winBody.startTab);
-            Qt.callLater(winBody.panel.focusSearch);
-        }
-
-        Body {
-            id: winBody
-            anchors.fill: parent
-            startTab: root.startTab
-            canMaximize: wc.canMaximize
-            maximized: win.maximized
-            onHeaderPressed: wc.tryStartMove()
-            onHeaderDoubleClicked: wc.tryToggleMaximize()
-            onMaximizeRequested: wc.tryToggleMaximize()
-            onCloseRequested: win.visible = false
-        }
-
-        FloatingWindowControls {
-            id: wc
-            targetWindow: win
+    Loader {
+        id: winLoader
+        source: Qt.resolvedUrl("MiseWindow.qml")
+        onLoaded: {
+            item.startTab = Qt.binding(() => root.startTab);
+            item.panelW = Qt.binding(() => root.panelW);
+            item.panelH = Qt.binding(() => root.panelH);
         }
     }
 
@@ -216,7 +96,7 @@ PluginComponent {
     Component {
         id: modalContent
 
-        Body {
+        MiseBody {
             width: modal.modalWidth
             height: modal.modalHeight
             startTab: root.startTab
