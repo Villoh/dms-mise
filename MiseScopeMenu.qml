@@ -47,16 +47,17 @@ Rectangle {
         spacing: Theme.spacingXXS
 
         // at most ~6 rows tall, scrolls beyond that
-        Flickable {
+        DankFlickable {
+            id: optFlick
             width: parent.width
             height: Math.min(optCol.implicitHeight, menu.controlH * 6)
             contentHeight: optCol.implicitHeight
             clip: true
-            boundsBehavior: Flickable.StopAtBounds
 
             Column {
                 id: optCol
-                width: parent.width
+                // leave a gutter for the scrollbar so it doesn't touch the row buttons
+                width: optFlick.width - (optFlick.contentHeight > optFlick.height ? Theme.spacingS : 0)
                 Repeater {
                     model: menu.options
                     delegate: Rectangle {

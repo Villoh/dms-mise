@@ -147,12 +147,11 @@ Rectangle {
         spacing: Theme.spacingXXS
 
         // scrolls beyond ~8 rows
-        Flickable {
+        DankFlickable {
             width: parent.width
             height: Math.min(sections.implicitHeight, menu.controlH * 8)
             contentHeight: sections.implicitHeight
             clip: true
-            boundsBehavior: Flickable.StopAtBounds
 
             Column {
                 id: sections
