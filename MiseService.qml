@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell.Io
 import qs.Services
 import "MiseSearch.js" as Search
+import "MiseScripts.js" as Scripts
 
 // Shared state for widget + launcher. One poll, one job at a time.
 Item {
@@ -191,7 +192,7 @@ Item {
         if (!p || resolveProc.running)
             return;
         projectError = "";
-        resolveProc.command = ["sh", "-c", resolveScript, "sh", p];
+        resolveProc.command = ["sh", "-c", Scripts.resolve, "sh", p];
         resolveProc.running = true;
     }
 
@@ -235,7 +236,7 @@ Item {
             return;
         }
         projProc.acc = ({});
-        projProc.command = ["sh", "-c", projScript, "sh"].concat(scopes.reduce((a, s) => a.concat([s, projectDir(s)]), []));
+        projProc.command = ["sh", "-c", Scripts.project, "sh"].concat(scopes.reduce((a, s) => a.concat([s, projectDir(s)]), []));
         projProc.running = true;
     }
 
@@ -290,16 +291,6 @@ Item {
         else if (kind === "bump")
             e.bump = rows;
     }
-
-    // one line per call: `<kind>\t<config>\t<json on one line>`; args come in (config, dir) pairs. The last line of
-    // a project is `warn`: why mise printed nothing (untrusted config, tools missing from the lockfile) or "".
-    readonly property string projScript: 'while [ $# -gt 1 ]; do f=$1; d=$2; shift 2; e=$(mktemp)\n' + 'for k in ls outdated bump; do\n' + 'case $k in ls) a="ls --json";; outdated) a="outdated --json";; bump) a="outdated --bump --json";; esac\n' + 'printf "%s\\t%s\\t" "$k" "$f"; mise -C "$d" $a 2>>"$e" | tr -d "\\n"; printf "\\n"\n' + 'done\n' + 'w=; grep -q "not trusted" "$e" && w=untrusted || { grep -q "not in the lockfile" "$e" && w=unlocked; }\n' + 'printf "warn\\t%s\\t\\"%s\\"\\n" "$f" "$w"; rm -f "$e"\n' + 'done'
-
-    // first line: $HOME; then every tracked config file that still exists
-    readonly property string trackedScript: 'd="${MISE_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/mise}/tracked-configs"\n' + 'echo "$HOME"\n' + 'for f in "$d"/*; do [ -L "$f" ] || continue; p=$(readlink -f "$f") && [ -f "$p" ] && echo "$p"; done'
-
-    // folder or file -> absolute config file path; error text on stderr
-    readonly property string resolveScript: 'p=$1\n' + 'case "$p" in "~"|"~/"*) p="$HOME${p#"~"}";; esac\n' + 'g="${MISE_GLOBAL_CONFIG_FILE:-$HOME/.config/mise/config.toml}"\n' + 'ok() { r=$(readlink -f "$1"); [ "$r" = "$(readlink -f "$g")" ] && { echo "That is the global config" >&2; exit 1; }; echo "$r"; exit 0; }\n' + '[ -f "$p" ] && ok "$p"\n' + '[ -d "$p" ] || { echo "Not found: $1" >&2; exit 1; }\n' + 'for c in mise.toml .mise.toml mise/config.toml .mise/config.toml .config/mise.toml .config/mise/config.toml; do [ -f "$p/$c" ] && ok "$p/$c"; done\n' + 'echo "No mise config in $1" >&2; exit 1'
 
     function alias(q) {
         return Search.alias(q);
@@ -689,30 +680,16 @@ Item {
         runMany(installUnlocked ? [use] : [use, lockAfterUse(tool, scope)], "Installing " + tool + inLabel(scope), "Installed " + tool + inLabel(scope), lockedInstall(tool, scope));
     }
 
-    // Under `locked = true`, `use` of a version that is already installed (another scope has it) needs no download:
-    // it writes the config, exits 0 and leaves the lockfile without the entry. Lock it, but only when `locked` is on:
-    // `mise lock` would create a lockfile nobody asked for.
-    readonly property string lockAfterUseScript: 'd=${1:-$HOME}; [ "$(mise -C "$d" settings get locked 2>/dev/null)" = true ] || exit 0\n' + 'if [ -n "$1" ]; then mise -C "$1" lock "$2"; else mise lock -g "$2"; fi'
-
     function lockAfterUse(tool, scope) {
-        return ["sh", "-c", lockAfterUseScript, "sh", scope ? projectDir(scope) : "", bareName(tool)];
+        return ["sh", "-c", Scripts.lockAfterUse, "sh", scope ? projectDir(scope) : "", bareName(tool)];
     }
-
-    // With `locked = true` mise refuses `use` for a tool the lockfile lacks. What the user would do by hand: write the
-    // tool into the config, lock it, install it. `config set` only writes a plain `name = "version"`, so tools with
-    // [options], a dotted name (it would split the key) are left out and fail with failureSummary's hint. One the config declares with options (a
-    // table or a list) is refused by the script itself, reading the toml: `config set` would overwrite them, while
-    // a plain version is rewritten, as `mise use` does. `config set` makes a paranoid config untrusted
-    // (its hash changed): if the file loaded before our edit and no longer does, it is trusted again, like mise does
-    // for its own rewrites. One that did not load before stays as it is.
-    readonly property string lockedScript: 'f=$1; [ -n "$f" ] || f=${MISE_GLOBAL_CONFIG_FILE:-$HOME/.config/mise/config.toml}\n' + 'v=$(mise config get -f "$f" "tools.$3" 2>/dev/null) && case "$v" in *=*|"["*) echo "ERROR: $3 has options in $f: change it there by hand" >&2; exit 1;; esac\n' + 'if [ -n "$1" ]; then\n' + 'mise -C "$2" ls --json >/dev/null 2>&1 && t=1\n' + 'mise config set -f "$1" "tools.$3" "$4" && { mise -C "$2" ls --json >/dev/null 2>&1 || [ -z "$t" ] || mise trust "$1"; } && mise -C "$2" lock "$3" && mise -C "$2" install --yes "$3"\n' + 'else\n' + 'mise config set -f "$f" "tools.$3" "$4" && mise lock -g "$3" && mise install --yes "$3"\n' + 'fi'
 
     function lockedInstall(tool, scope) {
         const n = bareName(tool);
         const v = tool.substring(n.length + 1) || "latest";
         if (!/^[\w:@\/-]+$/.test(n) || !/^[\w.-]+$/.test(v) || (tool !== n && tool[n.length] !== "@"))
             return [];
-        return ["sh", "-c", lockedScript, "sh", scope || "", scope ? projectDir(scope) : "", n, v];
+        return ["sh", "-c", Scripts.locked, "sh", scope || "", scope ? projectDir(scope) : "", n, v];
     }
 
     // removes from that config and prunes the installed version
@@ -994,7 +971,7 @@ Item {
 
     Process {
         id: trackedProc
-        command: ["sh", "-c", root.trackedScript]
+        command: ["sh", "-c", Scripts.tracked]
         stdout: StdioCollector {
             onStreamFinished: {
                 const l = text.split("\n").filter(x => x.trim());
