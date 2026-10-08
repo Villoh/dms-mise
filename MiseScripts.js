@@ -35,6 +35,17 @@ var resolve = [
     'echo "No mise config in $1" >&2; exit 1'
 ].join("\n");
 
+// args: ("untrusted" | "unlocked", config, dir) triples ("" = global): `mise trust` the config, or `mise lock`
+// (`-g` for global). One failing does not stop the others (it would stay first in line and block them); the
+// job fails at the end.
+var fix = [
+    'rc=0',
+    'while [ $# -gt 2 ]; do k=$1; f=$2; d=$3; shift 3',
+    'if [ "$k" = untrusted ]; then mise trust "$f"; elif [ -n "$f" ]; then mise -C "$d" lock; else mise lock -g; fi || rc=1',
+    'done',
+    'exit $rc'
+].join("\n");
+
 // args: project dir ("" = global), tool. Under `locked = true`, `use` of a version that is already
 // installed (another scope has it) needs no download: it writes the config, exits 0 and leaves the
 // lockfile without the entry. Lock it, but only when `locked` is on: `mise lock` would create a

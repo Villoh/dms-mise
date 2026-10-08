@@ -66,11 +66,17 @@ Item {
     // scope picker (Settings > Project tools): "" = global (default), "*" = everything, else a project's config path
     property string scope: ""
     property bool menuOpen: false   // scope menu (toolbar button)
+    property bool fixOpen: false    // fix list (toolbar button): which scopes to trust / lock
     property bool addPending: false // an add (typed or picked) is in flight: select the project when it lands
     function closeMenu() {
         menuOpen = false;
+        fixOpen = false;
         scopeMenu.reset();
     }
+    // the scopes of the picked one that need the same fix (see MiseService.warnedScopes)
+    readonly property var fixScopes: MiseService.warnedScopes(scope)
+    // the icon of the fix button: a trust is more pressing than a lock (an untrusted project cannot be locked)
+    readonly property string fixKind: fixScopes.some(s => MiseService.warnOf(s) === "untrusted") ? "untrusted" : fixScopes.length ? "unlocked" : ""
     // where Install writes: the picked scope, global when looking at everything
     readonly property string target: scope === "*" ? "" : scope
     readonly property bool showScope: scope === "*" && MiseProjects.scopes.length > 0
@@ -223,12 +229,23 @@ Item {
         scope: pop.scope
         scopeName: pop.scopeName
         menuOpen: pop.menuOpen
+        fixOpen: pop.fixOpen
+        fixKind: pop.fixKind
+        fixCount: pop.fixScopes.length
         elsewhere: pop.elsewhere
         checking: pop.checkingShown
         controlH: pop.controlH
         iconBtn: pop.iconBtn
         onTabPicked: index => pop.tab = index
         onScopeClicked: pop.menuOpen ? pop.closeMenu() : (pop.menuOpen = true)
+        onFixClicked: {
+            if (pop.fixOpen) {
+                pop.closeMenu();
+                return;
+            }
+            fixMenu.open();
+            pop.fixOpen = true;
+        }
     }
 
     // ---- job banner: what mise is doing right now ----
@@ -517,13 +534,29 @@ Item {
         }
     }
 
-    // ---- scope menu: opens under the toolbar button. The scrim swallows clicks outside, so nothing else
-    // in the panel is reachable (or half-typed) while it is open ----
+    // ---- scope menu and fix list: open under the toolbar. The scrim swallows clicks outside, so nothing else
+    // in the panel is reachable (or half-typed) while one is open ----
     MouseArea {
         anchors.fill: parent
         z: 10
-        visible: pop.menuOpen
+        visible: pop.menuOpen || pop.fixOpen
         onClicked: pop.closeMenu()
+    }
+
+    MiseFixMenu {
+        id: fixMenu
+        z: 11
+        visible: pop.fixOpen && pop.fixScopes.length > 0
+        anchors.top: toolbar.bottom
+        anchors.topMargin: Theme.spacingXS
+        anchors.right: parent.right
+        width: Math.min(parent.width, pop.controlH * 8)
+        scopes: pop.fixScopes
+        controlH: pop.controlH
+        onRun: scopes => {
+            pop.closeMenu();
+            MiseService.fix(scopes);
+        }
     }
 
     MiseScopeMenu {

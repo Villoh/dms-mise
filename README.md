@@ -160,8 +160,8 @@ Settings → Plugins → mise: check interval (15 min, 30 min, 1 h, 4 h, daily).
 | Remove a version | `mise uninstall --yes <tool>@<version>` |
 | Prune | `mise ls --prunable --json` (with every check), `mise prune --tools --yes [tool]` |
 | Remove | `mise unuse --global --yes <tool>`, or `mise unuse --path <config> --yes <tool>` for a project |
-| Trust | `mise trust <config>` (only from the shield button, after two clicks) |
-| Lock | `mise lock -g`, or `mise -C <project> lock` (only from the lock button, after two clicks) |
+| Trust | `mise trust <config>` for each project you check in the list the fix button opens (shield or lock) |
+| Lock | `mise lock -g`, or `mise -C <project> lock`, for each scope you check in the same list |
 
 One job at a time.
 
@@ -172,8 +172,8 @@ The plugin only runs `mise` and never edits its settings; it works with these:
 | Setting | What happens |
 | --- | --- |
 | `locked = true` | Respected. `mise use` refuses a tool the lockfile has no entry for, so for a plain tool (`name` or `name@version`; a version already in the config is rewritten, as `mise use` does) *Install* does what you would by hand: `mise config set` writes it to the config, `mise lock` locks it, `mise install` installs it. Tools with `[options]`, a `.` in the name, or declared in that config with options (a table or a list) fail with mise's error and a hint: add them to the config yourself, run `mise lock` and `mise install`, or turn on *Install with `locked` off* in Settings (then only Install runs with `MISE_LOCKED=0` and mise writes the lockfile entries). `lockfile = true` alone does not create a lockfile: run `mise lock` once in a project. When `mise use` goes through (the version is already installed, for example by another scope), *Install* then runs `mise lock <tool>` in that scope so the lockfile matches the config. Update and Bump always run with your settings. |
-| `paranoid = true` / untrusted configs | A project config has to be trusted by hand (`mise trust`), and again each time its content changes outside mise. Until then the project shows nothing and the popout says `not trusted, run mise trust there` and a shield button appears next to the scope picker: click it, then click again to run `mise trust` on that project (only do it for configs you wrote or reviewed). The plugin itself never runs `mise trust` unless you click that button, but Install runs `mise use`, and mise trusts the config `use` writes to (even when it fails): that is mise's behavior, not a setting of the plugin. The one other place it runs `mise trust` is the locked-install flow above, after its own edit of a project config, and only if that config loaded right before and no longer does (that is, under `paranoid`). |
-| Tools missing from the lockfile | `mise outdated` skips them, so the list would say *up to date*. The popout says `tools missing from its lockfile, run mise lock` instead, with a lock button next to the scope picker (click, then click again) that runs `mise lock` for that project, or `mise lock -g` for the global config. It resolves versions and writes `mise.lock`, not your config. Happens after editing a `mise.toml` by hand or pulling a change to it. |
+| `paranoid = true` / untrusted configs | A project config has to be trusted by hand (`mise trust`), and again each time its content changes outside mise. Until then the project shows nothing and the popout says `not trusted, run mise trust there` and a shield button appears next to the scope picker: click it for a list with a *Trust* and a *Lock* section (each with its own check all), check the ones to fix (an untrusted project starts unchecked when there are several) and click the button (only do it for configs you wrote or reviewed). The plugin itself never runs `mise trust` unless you click that button, but Install runs `mise use`, and mise trusts the config `use` writes to (even when it fails): that is mise's behavior, not a setting of the plugin. The one other place it runs `mise trust` is the locked-install flow above, after its own edit of a project config, and only if that config loaded right before and no longer does (that is, under `paranoid`). |
+| Tools missing from the lockfile | `mise outdated` skips them, so the list would say *up to date*. The popout says `tools missing from the lockfile, run mise lock` instead, with the same list (locks start checked) running `mise lock` for the checked ones (`mise lock -g` for the global config); one failing does not stop the others. It resolves versions and writes `mise.lock`, not your config. Happens after editing a `mise.toml` by hand or pulling a change to it. |
 | `minimum_release_age` | Applied by mise itself; the plugin passes no flag that overrides it. |
 | `disable_backends`, `enable_tools` | The registry list follows them. Live search and a typed `backend:tool` do not: installing a disabled one fails with mise's own message. |
 | `auto_install_disable_tools`, `sandbox.*`, `trusted_config_paths` | Not used: the plugin never runs `mise x`, `run` or tasks. |
@@ -212,7 +212,7 @@ One file per concern, all flat in the plugin folder (Quickshell resolves them th
 | `MiseSearch.js` | Pure search / ranking / parsers / verifier URLs, no Quickshell (tested) |
 | `MiseScripts.js` | The `sh` scripts the services run |
 | `MisePanel.qml` | The popout: derives the rows and the picked scope, lays out the pieces below |
-| `MisePanelToolbar`, `MiseJobBanner`, `MiseBackendChips`, `MiseUpdateRow`, `MiseToolRow`, `MiseToolDetails`, `MiseVersionChip`, `MiseHttpForm` + `MiseHttpDraft`, `MiseScopeMenu` | Panel pieces, fed by properties; `MiseConfirm` is the shared arm-then-confirm click |
+| `MisePanelToolbar`, `MiseJobBanner`, `MiseBackendChips`, `MiseUpdateRow`, `MiseToolRow`, `MiseToolDetails`, `MiseVersionChip`, `MiseHttpForm` + `MiseHttpDraft`, `MiseScopeMenu`, `MiseFixMenu` | Panel pieces, fed by properties; `MiseConfirm` is the shared arm-then-confirm click |
 | `MiseBar.qml`, `MiseLauncher.qml`, `MiseDaemon.qml`, `MiseSettings.qml` | Bar widget, launcher provider, daemon, settings page |
 
 ### Tests

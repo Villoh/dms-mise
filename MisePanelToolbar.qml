@@ -13,12 +13,16 @@ Item {
     property string scope: ""
     property string scopeName: ""
     property bool menuOpen: false
+    property bool fixOpen: false     // the fix list is open
+    property string fixKind: ""      // "untrusted" | "unlocked" | "" = nothing to fix in the picked scope
+    property int fixCount: 0         // how many scopes need it
     property int elsewhere: 0        // pending in scopes other than the picked one: dot on the button
     property bool checking: false
     property real controlH: Theme.iconSize + Theme.spacingL
     property real iconBtn: Theme.iconSize + Theme.spacingM
     signal tabPicked(int index)
     signal scopeClicked
+    signal fixClicked
 
     height: controlH
 
@@ -100,30 +104,21 @@ Item {
         }
     }
 
-    // what the warning of the picked scope asks for: `mise trust` (paranoid) or `mise lock`. First click arms, second runs.
+    // what the warnings of the picked scope ask for: `mise trust` (paranoid) or `mise lock`. Opens the list of
+    // projects to fix (MiseFixMenu).
     DankActionButton {
         id: fixBtn
-        readonly property bool armed: fixConfirm.armed
-        readonly property var target: MiseService.warnedScope(toolbar.scope)   // undefined = nothing to fix
-        readonly property string kind: target === undefined ? "" : MiseService.warnOf(target)
-        readonly property string label: target === undefined ? "" : MiseProjects.label(target)
+        readonly property string kind: toolbar.fixKind
         visible: kind !== ""
         anchors.right: scopeBtn.visible ? scopeBtn.left : refreshBtn.left
         anchors.rightMargin: Theme.spacingXS
         anchors.verticalCenter: parent.verticalCenter
         buttonSize: toolbar.iconBtn
-        iconName: armed ? "check" : (kind === "untrusted" ? "gpp_maybe" : "lock")
-        iconColor: armed ? Theme.surface : Theme.warning
-        backgroundColor: armed ? Theme.warning : "transparent"
-        tooltipText: kind === "untrusted" ? (armed ? "Click again to run `mise trust` on " + label : "Not trusted: trust " + label + " (only if you wrote or reviewed its mise config)") : (armed ? "Click again to run `mise lock` on " + label : "Tools missing from the lockfile of " + label + ": run `mise lock`")
+        iconName: toolbar.fixOpen ? "close" : (kind === "untrusted" ? "gpp_maybe" : "lock")
+        iconColor: Theme.warning
+        tooltipText: toolbar.fixCount > 1 ? toolbar.fixCount + " scopes need `mise trust` or `mise lock`: choose what to fix" : kind === "untrusted" ? "Not trusted: choose what to trust" : "Tools missing from the lockfile: choose what to lock"
         enabled: !MiseJobs.busy
-        onTargetChanged: fixConfirm.cancel()
-        onKindChanged: fixConfirm.cancel()
-        onClicked: fixConfirm.click()
-        MiseConfirm {
-            id: fixConfirm
-            onConfirmed: MiseService.fix(fixBtn.target)
-        }
+        onClicked: toolbar.fixClicked()
     }
 
     // refresh: hover spins the icon, press shrinks, checking morphs to a circle with a spinner
