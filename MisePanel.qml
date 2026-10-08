@@ -296,173 +296,21 @@ Item {
     // version_list_url is what lets `latest` resolve
     readonly property string httpSpec: "http:" + httpName.trim() + "[url=" + httpUrl.trim() + ",version_list_url=" + httpList.trim() + Object.keys(httpOpt).filter(k => httpOpt[k].trim() !== "").map(k => "," + k + "=" + httpOpt[k].trim()).join("") + "]@latest"
 
-    // ---- toolbar: tabs + refresh ----
-    Item {
+    // ---- toolbar: tabs, scope picker, fix, refresh ----
+    MisePanelToolbar {
         id: toolbar
         width: parent.width
-        height: pop.controlH
-
-        DankButtonGroup {
-            id: toolbarTabs
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            buttonHeight: pop.iconBtn
-            model: ["Updates" + (pop.count > 0 ? " (" + pop.count + ")" : ""), "Tools"]
-            currentIndex: pop.tab
-            onSelectionChanged: (index, selected) => {
-                if (selected)
-                    pop.tab = index;
-            }
-        }
-
-        // scope picker: one compact button instead of a chip row, so it scales to any number of projects
-        Rectangle {
-            id: scopeBtn
-            visible: MiseProjects.mode !== "off"
-            anchors.right: refreshBtn.left
-            anchors.rightMargin: Theme.spacingXS
-            anchors.verticalCenter: parent.verticalCenter
-            height: pop.iconBtn
-            // the label is what shrinks (elided) when the project name is long
-            readonly property real maxLabelW: pop.width - toolbarTabs.width - refreshBtn.width - (fixBtn.visible ? fixBtn.width + Theme.spacingXS : 0) - Theme.spacingM * 4 - (Theme.iconSize - 6) * 2 - Theme.spacingXS * 2
-            width: scopeBtnRow.implicitWidth + Theme.spacingM * 2
-            radius: Theme.cornerRadius
-            color: pop.menuOpen || scopeHover.containsMouse ? Theme.primaryHoverLight : Theme.surfaceContainerHigh
-            border.width: pop.scope !== "*" ? 1 : 0
-            border.color: Theme.primary
-            // something is pending in a scope you are not looking at
-            Rectangle {
-                visible: pop.elsewhere > 0
-                anchors.top: parent.top
-                anchors.right: parent.right
-                anchors.topMargin: -Theme.spacingXXS
-                anchors.rightMargin: -Theme.spacingXXS
-                width: Theme.spacingS + Theme.spacingXXS
-                height: width
-                radius: width / 2
-                color: Theme.primary
-                border.width: 1
-                border.color: Theme.surface
-            }
-            MouseArea {
-                id: scopeHover
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: pop.menuOpen ? pop.closeMenu() : (pop.menuOpen = true)
-            }
-            Row {
-                id: scopeBtnRow
-                anchors.centerIn: parent
-                spacing: Theme.spacingXS
-                DankIcon {
-                    anchors.verticalCenter: parent.verticalCenter
-                    name: pop.scope === "*" ? "layers" : (pop.scope === "" ? "public" : "folder")
-                    size: Theme.iconSize - 6
-                    color: pop.scope === "*" ? Theme.surfaceVariantText : Theme.primary
-                }
-                StyledText {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: Math.min(implicitWidth, scopeBtn.maxLabelW)
-                    text: pop.scopeName
-                    font.pixelSize: Theme.fontSizeSmall
-                    color: Theme.surfaceText
-                    elide: Text.ElideRight
-                    wrapMode: Text.NoWrap
-                    maximumLineCount: 1
-                }
-                DankIcon {
-                    anchors.verticalCenter: parent.verticalCenter
-                    name: pop.menuOpen ? "arrow_drop_up" : "arrow_drop_down"
-                    size: Theme.iconSize - 6
-                    color: Theme.surfaceVariantText
-                }
-            }
-        }
-
-        // what the warning of the picked scope asks for: `mise trust` (paranoid) or `mise lock`. First click arms, second runs.
-        DankActionButton {
-            id: fixBtn
-            readonly property bool armed: fixConfirm.armed
-            readonly property var target: MiseService.warnedScope(pop.scope)   // undefined = nothing to fix
-            readonly property string kind: target === undefined ? "" : MiseService.warnOf(target)
-            readonly property string label: target === undefined ? "" : MiseProjects.label(target)
-            visible: kind !== ""
-            anchors.right: scopeBtn.visible ? scopeBtn.left : refreshBtn.left
-            anchors.rightMargin: Theme.spacingXS
-            anchors.verticalCenter: parent.verticalCenter
-            buttonSize: pop.iconBtn
-            iconName: armed ? "check" : (kind === "untrusted" ? "gpp_maybe" : "lock")
-            iconColor: armed ? Theme.surface : Theme.warning
-            backgroundColor: armed ? Theme.warning : "transparent"
-            tooltipText: kind === "untrusted" ? (armed ? "Click again to run `mise trust` on " + label : "Not trusted: trust " + label + " (only if you wrote or reviewed its mise config)") : (armed ? "Click again to run `mise lock` on " + label : "Tools missing from the lockfile of " + label + ": run `mise lock`")
-            enabled: !MiseJobs.busy
-            onTargetChanged: fixConfirm.cancel()
-            onKindChanged: fixConfirm.cancel()
-            onClicked: fixConfirm.click()
-            MiseConfirm {
-                id: fixConfirm
-                onConfirmed: MiseService.fix(fixBtn.target)
-            }
-        }
-
-        // refresh: hover spins the icon, press shrinks, checking morphs to a circle with a spinner
-        DankActionButton {
-            id: refreshBtn
-            readonly property bool active: pop.checkingShown
-            property bool hovered: false
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            buttonSize: pop.iconBtn
-            iconName: ""   // the icon is drawn below so it can rotate
-            tooltipText: "Check for updates"
-            enabled: !pop.checkingShown && !MiseJobs.busy
-            opacity: enabled || active ? 1.0 : 0.5
-            radius: active ? height / 2 : Theme.cornerRadius
-            border.width: 1
-            border.color: Theme.withAlpha(Theme.primary, hovered ? 0.3 : 0.15)
-            scale: pressed ? 0.92 : (hovered && enabled ? 1.05 : 1.0)
-            onEntered: hovered = true
-            onExited: hovered = false
-            onClicked: MiseService.refresh()
-
-            Behavior on scale {
-                NumberAnimation {
-                    duration: Theme.shortDuration
-                    easing.type: Easing.OutQuad
-                }
-            }
-            // radius already animates via StyledRect's own Behavior
-            Behavior on border.color {
-                ColorAnimation {
-                    duration: Theme.popoutAnimationDuration
-                }
-            }
-
-            DankIcon {
-                anchors.centerIn: parent
-                name: "refresh"
-                size: refreshBtn.iconSize
-                color: Theme.primary
-                smoothTransform: true
-                visible: !refreshBtn.active
-                rotation: refreshBtn.hovered && refreshBtn.enabled ? 180 : 0
-
-                Behavior on rotation {
-                    NumberAnimation {
-                        duration: Theme.popoutAnimationDuration
-                        easing.type: Easing.OutBack
-                    }
-                }
-            }
-
-            DankSpinner {
-                anchors.centerIn: parent
-                size: Theme.iconSize - 6
-                color: Theme.primary
-                visible: refreshBtn.active
-            }
-        }
+        count: pop.count
+        tab: pop.tab
+        scope: pop.scope
+        scopeName: pop.scopeName
+        menuOpen: pop.menuOpen
+        elsewhere: pop.elsewhere
+        checking: pop.checkingShown
+        controlH: pop.controlH
+        iconBtn: pop.iconBtn
+        onTabPicked: index => pop.tab = index
+        onScopeClicked: pop.menuOpen ? pop.closeMenu() : (pop.menuOpen = true)
     }
 
     // ---- job banner: what mise is doing right now ----

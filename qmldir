@@ -4,6 +4,7 @@ singleton MiseJobs 1.0 MiseJobs.qml
 singleton MiseInfo 1.0 MiseInfo.qml
 singleton MiseProjects 1.0 MiseProjects.qml
 MisePanel 1.0 MisePanel.qml
+MisePanelToolbar 1.0 MisePanelToolbar.qml
 MiseJobBanner 1.0 MiseJobBanner.qml
 MiseConfirm 1.0 MiseConfirm.qml
 MiseScopeMenu 1.0 MiseScopeMenu.qml
