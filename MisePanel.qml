@@ -398,7 +398,7 @@ Item {
             iconColor: armed ? Theme.surface : Theme.warning
             backgroundColor: armed ? Theme.warning : "transparent"
             tooltipText: kind === "untrusted" ? (armed ? "Click again to run `mise trust` on " + label : "Not trusted: trust " + label + " (only if you wrote or reviewed its mise config)") : (armed ? "Click again to run `mise lock` on " + label : "Tools missing from the lockfile of " + label + ": run `mise lock`")
-            enabled: !MiseService.busy
+            enabled: !MiseJobs.busy
             onTargetChanged: armed = false
             onKindChanged: armed = false
             onClicked: {
@@ -427,7 +427,7 @@ Item {
             buttonSize: pop.iconBtn
             iconName: ""   // the icon is drawn below so it can rotate
             tooltipText: "Check for updates"
-            enabled: !pop.checkingShown && !MiseService.busy
+            enabled: !pop.checkingShown && !MiseJobs.busy
             opacity: enabled || active ? 1.0 : 0.5
             radius: active ? height / 2 : Theme.cornerRadius
             border.width: 1
@@ -482,7 +482,7 @@ Item {
         anchors.top: toolbar.bottom
         anchors.topMargin: Theme.spacingS
         width: parent.width
-        visible: MiseService.busy
+        visible: MiseJobs.busy
         height: visible ? bannerCol.implicitHeight + Theme.spacingM * 2 : 0
         radius: Theme.cornerRadius
         color: Theme.withAlpha(Theme.primary, 0.10)
@@ -505,7 +505,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 StyledText {
-                    text: MiseService.jobLabel + "…"
+                    text: MiseJobs.label + "…"
                     font.pixelSize: Theme.fontSizeSmall
                     font.weight: Font.Medium
                     color: Theme.surfaceText
@@ -514,7 +514,7 @@ Item {
             }
             StyledText {
                 width: parent.width
-                text: MiseService.jobLog.length ? MiseService.jobLog[MiseService.jobLog.length - 1] : ""
+                text: MiseJobs.log.length ? MiseJobs.log[MiseJobs.log.length - 1] : ""
                 font.pixelSize: Theme.fontSizeSmall
                 font.family: Theme.monoFontFamily
                 color: Theme.surfaceVariantText
@@ -575,7 +575,7 @@ Item {
         }
         // Enter installs the top not-yet-installed hit
         onAccepted: {
-            if (pop.tab !== 1 || MiseService.busy)
+            if (pop.tab !== 1 || MiseJobs.busy)
                 return;
             const r = pop.toolList.find(x => !x.installed && !x.missing && !x.template);
             if (r)
@@ -622,7 +622,7 @@ Item {
         text: pop.scopedCount > 0 ? "Update all (" + pop.scopedCount + ")" : "Update all"
         iconName: "upgrade"
         buttonHeight: pop.controlH + Theme.spacingXS
-        enabled: pop.scopedCount > 0 && !MiseService.busy
+        enabled: pop.scopedCount > 0 && !MiseJobs.busy
         onClicked: MiseService.upgrade("", pop.scope)
     }
 
@@ -639,7 +639,7 @@ Item {
         buttonHeight: pop.controlH + Theme.spacingXS
         backgroundColor: armed ? Theme.error : Theme.warning
         textColor: Theme.surface
-        enabled: !MiseService.busy
+        enabled: !MiseJobs.busy
         onClicked: {
             if (!armed) {
                 armed = true;
@@ -668,7 +668,7 @@ Item {
         buttonHeight: pop.controlH + Theme.spacingXS
         backgroundColor: armed ? Theme.error : Theme.surfaceContainerHigh
         textColor: armed ? Theme.surface : Theme.surfaceText
-        enabled: !MiseService.busy
+        enabled: !MiseJobs.busy
         onClicked: {
             if (!armed) {
                 armed = true;
@@ -901,7 +901,7 @@ Item {
                         iconName: modelData.bump ? "upgrade" : "download"
                         iconColor: modelData.bump ? Theme.warning : Theme.primary
                         tooltipText: modelData.bump ? "Bump: rewrites \"" + modelData.requested + "\" in your " + (modelData.scope ? "project's" : "global") + " mise config" : (modelData.current ? "Update" : "Install")
-                        enabled: !MiseService.busy
+                        enabled: !MiseJobs.busy
                         onClicked: modelData.bump ? MiseService.bump(modelData.name, modelData.scope) : MiseService.upgrade(modelData.name, modelData.scope)
                     }
                 }
@@ -1025,7 +1025,7 @@ Item {
                     iconColor: modelData.installed ? (row.confirm ? Theme.surface : Theme.error) : Theme.primary
                     backgroundColor: row.confirm ? Theme.error : "transparent"
                     tooltipText: modelData.installed ? (row.confirm ? "Click again to remove" : "Remove" + MiseService.inLabel(modelData.scope)) : (modelData.missing ? "Install the declared version" + MiseService.inLabel(modelData.scope) : "Install latest" + (pop.target ? MiseService.inLabel(pop.target) : ""))
-                    enabled: !MiseService.busy
+                    enabled: !MiseJobs.busy
                     onClicked: {
                         if (modelData.missing) {
                             MiseService.upgrade(modelData.name, modelData.scope);
@@ -1227,7 +1227,7 @@ Item {
                         text: "Install latest" + (pop.target ? MiseService.inLabel(pop.target) : "")
                         iconName: "download"
                         buttonHeight: pop.controlH
-                        enabled: pop.httpReady && !MiseService.busy
+                        enabled: pop.httpReady && !MiseJobs.busy
                         onClicked: {
                             MiseService.install(pop.httpSpec, pop.target);
                             pop.openRow = "";
@@ -1280,10 +1280,10 @@ Item {
                             width: Math.min(details.width, pruneRow.implicitWidth + Theme.spacingM * 2)
                             height: pop.chipH
                             radius: Theme.cornerRadius
-                            color: row.pruneArmed ? Theme.error : (pruneArea.containsMouse && !MiseService.busy ? Theme.withAlpha(Theme.error, 0.15) : "transparent")
+                            color: row.pruneArmed ? Theme.error : (pruneArea.containsMouse && !MiseJobs.busy ? Theme.withAlpha(Theme.error, 0.15) : "transparent")
                             border.width: 1
                             border.color: row.pruneArmed ? Theme.error : Theme.withAlpha(Theme.outline, 0.4)
-                            opacity: MiseService.busy ? 0.5 : 1
+                            opacity: MiseJobs.busy ? 0.5 : 1
                             Row {
                                 id: pruneRow
                                 anchors.centerIn: parent
@@ -1311,7 +1311,7 @@ Item {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                enabled: !MiseService.busy
+                                enabled: !MiseJobs.busy
                                 onClicked: {
                                     if (!row.pruneArmed) {
                                         row.pruneArmed = true;
@@ -1336,10 +1336,10 @@ Item {
                                 width: Theme.spacingM + verRow.implicitWidth + (trashBtn.visible ? Theme.spacingS + trashBtn.width + trashBtn.anchors.rightMargin : Theme.spacingM)
                                 height: pop.chipH
                                 radius: Theme.cornerRadius
-                                color: chipArea.containsMouse && !MiseService.busy ? Theme.primaryHoverLight : chip.active ? Theme.withAlpha(Theme.primary, 0.2) : "transparent"
+                                color: chipArea.containsMouse && !MiseJobs.busy ? Theme.primaryHoverLight : chip.active ? Theme.withAlpha(Theme.primary, 0.2) : "transparent"
                                 border.width: chip.active ? 2 : 1
                                 border.color: chip.active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.4)
-                                opacity: MiseService.busy ? 0.5 : 1
+                                opacity: MiseJobs.busy ? 0.5 : 1
                                 Timer {
                                     id: chipReset
                                     interval: 3000
@@ -1350,7 +1350,7 @@ Item {
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    enabled: !MiseService.busy
+                                    enabled: !MiseJobs.busy
                                     onClicked: MiseService.install(MiseService.bareName(row.modelData.name) + "@" + chip.modelData, row.modelData.scope)
                                 }
                                 Row {
@@ -1395,7 +1395,7 @@ Item {
                                         anchors.fill: parent
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
-                                        enabled: !MiseService.busy
+                                        enabled: !MiseJobs.busy
                                         onClicked: {
                                             if (!chip.armed) {
                                                 chip.armed = true;

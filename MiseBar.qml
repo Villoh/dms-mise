@@ -12,7 +12,7 @@ PluginComponent {
 
     // what the badge counts: global only (default) or every followed project too (Settings > Project tools)
     readonly property int count: MiseService.badgeOutdated.length
-    readonly property bool working: MiseService.busy || MiseService.checking
+    readonly property bool working: MiseJobs.busy || MiseService.checking
     readonly property int bumpCount: MiseService.badgeBumps.length
     // primary = updates, warning (orange) = only bumps pending
     readonly property color pillColor: MiseService.error ? Theme.error : (count > 0 ? Theme.primary : (bumpCount > 0 ? Theme.warning : Theme.surfaceVariantText))

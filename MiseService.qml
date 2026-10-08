@@ -19,11 +19,7 @@ Item {
     property var prunable: ({})  // name -> [versions] no tracked config uses (`mise ls --prunable`)
     readonly property int prunableCount: Object.keys(prunable).reduce((n, k) => n + prunable[k].length, 0)
     property var registry: []    // [{name, backend}] ~1000 curated entries
-    property bool installUnlocked: false  // let Install run with `locked` off, so it can add the tool to the lockfile (Settings)
     property bool checking: false
-    property bool busy: false
-    property string jobLabel: ""
-    property var jobLog: []      // last lines of mise output while a job runs
     property string error: ""
     property double lastCheck: 0
     property int intervalMin: 30  // minutes between background checks (Settings)
@@ -77,7 +73,6 @@ Item {
         badgeScope = PluginService.loadPluginData("mise", "badgeScope", "global") === "all" ? "all" : "global";
         const b = PluginService.loadPluginData("mise", "showBumps", true);
         showBumps = !(b === false || b === "false");
-        installUnlocked = PluginService.loadPluginData("mise", "installUnlocked", false) === true;
     }
 
     Connections {
@@ -90,6 +85,15 @@ Item {
         function onPluginStateChanged(pluginId) {
             if (pluginId === "mise" && !root.saving)
                 root.loadState();
+        }
+    }
+
+    // after a job the installed / active versions changed
+    Connections {
+        target: MiseJobs
+        function onFinished() {
+            root.refresh();
+            root.refreshInfo();
         }
     }
 
@@ -315,27 +319,6 @@ Item {
         refreshProjects();
     }
 
-    function run(args, label, doneMsg, fallback) {
-        runMany([args], label, doneMsg, fallback);
-    }
-
-    // commands run one after another; the first failure stops the rest
-    // `fallback`: a command to try, once, if the first one is refused for a missing lockfile entry
-    function runMany(cmds, label, doneMsg, fallback) {
-        if (busy) {
-            ToastService.showError("mise", "Another job is running");
-            return;
-        }
-        jobProc.doneMsg = doneMsg;
-        jobProc.queue = cmds.slice(1);
-        jobProc.fallback = fallback || [];
-        jobProc.prepare(cmds[0]);
-        jobLabel = label;
-        jobLog = [];
-        busy = true;
-        jobProc.running = true;
-    }
-
     // why a scope shows nothing ("" = nothing to say); `*` = the first project that has a reason
     readonly property var warnText: ({
             untrusted: "not trusted, run `mise trust` there",
@@ -358,9 +341,9 @@ Item {
     // `mise lock` for its tools (`-g` for the global config). Only ever called from a button that asks twice.
     function fix(scope) {
         if (warnOf(scope) === "untrusted")
-            run(["trust", scope], "Trusting " + scopeLabel(scope), "Trusted " + scopeLabel(scope));
+            MiseJobs.run(["trust", scope], "Trusting " + scopeLabel(scope), "Trusted " + scopeLabel(scope));
         else
-            run(scope ? ["-C", projectDir(scope), "lock"] : ["lock", "-g"], "Locking " + scopeLabel(scope), "Locked " + scopeLabel(scope));
+            MiseJobs.run(scope ? ["-C", projectDir(scope), "lock"] : ["lock", "-g"], "Locking " + scopeLabel(scope), "Locked " + scopeLabel(scope));
     }
 
     // project scopes run in the project's directory, so mise reads and rewrites that config
@@ -390,12 +373,12 @@ Item {
         ] : inFilter(outdated, scope);
         if (!rows.length)
             return;
-        runMany(perScope(rows, ["upgrade", "--yes"]), tool ? "Upgrading " + tool + inLabel(scope) : "Upgrading all tools", tool ? "Upgraded " + tool + inLabel(scope) : "Upgraded all tools");
+        MiseJobs.runMany(perScope(rows, ["upgrade", "--yes"]), tool ? "Upgrading " + tool + inLabel(scope) : "Upgrading all tools", tool ? "Upgraded " + tool + inLabel(scope) : "Upgraded all tools");
     }
 
     // rewrites the version in the config that declares the tool (global or the project's)
     function bump(tool, scope) {
-        run(inDir(scope, ["upgrade", "--bump", "--yes", tool]), "Bumping " + tool + inLabel(scope), "Bumped " + tool + inLabel(scope));
+        MiseJobs.run(inDir(scope, ["upgrade", "--bump", "--yes", tool]), "Bumping " + tool + inLabel(scope), "Bumped " + tool + inLabel(scope));
     }
 
     // only the bump-only tools: `upgrade --bump` with no args would also rewrite in-range ones
@@ -403,13 +386,13 @@ Item {
         const rows = inFilter(bumps, scope);
         if (!rows.length)
             return;
-        runMany(perScope(rows, ["upgrade", "--bump", "--yes"]), "Bumping " + rows.length + " tools", "Bumped " + rows.length + " tools");
+        MiseJobs.runMany(perScope(rows, ["upgrade", "--bump", "--yes"]), "Bumping " + rows.length + " tools", "Bumped " + rows.length + " tools");
     }
 
     // scope "" / omitted = global config, otherwise the project's config file path
     function install(tool, scope) {
         const use = scope ? ["use", "--path", scope, "--yes", tool] : ["use", "--global", "--yes", tool];
-        runMany(installUnlocked ? [use] : [use, lockAfterUse(tool, scope)], "Installing " + tool + inLabel(scope), "Installed " + tool + inLabel(scope), lockedInstall(tool, scope));
+        MiseJobs.runMany(MiseJobs.installUnlocked ? [use] : [use, lockAfterUse(tool, scope)], "Installing " + tool + inLabel(scope), "Installed " + tool + inLabel(scope), lockedInstall(tool, scope));
     }
 
     function lockAfterUse(tool, scope) {
@@ -426,7 +409,7 @@ Item {
 
     // removes from that config and prunes the installed version
     function uninstall(tool, scope) {
-        run(scope ? ["unuse", "--path", scope, "--yes", tool] : ["unuse", "--global", "--yes", tool], "Removing " + tool + inLabel(scope), "Removed " + tool + inLabel(scope));
+        MiseJobs.run(scope ? ["unuse", "--path", scope, "--yes", tool] : ["unuse", "--global", "--yes", tool], "Removing " + tool + inLabel(scope), "Removed " + tool + inLabel(scope));
     }
 
     // ---- tool info (row expander): `mise tool --json` + the last versions from `mise ls-remote` ----
@@ -578,27 +561,13 @@ Item {
 
     // removes that one installed version; the config is not touched
     function uninstallVersion(tool, version) {
-        run(["uninstall", "--yes", tool + "@" + version], "Removing " + tool + "@" + version, "Removed " + tool + "@" + version);
+        MiseJobs.run(["uninstall", "--yes", tool + "@" + version], "Removing " + tool + "@" + version, "Removed " + tool + "@" + version);
     }
 
     // unused versions of one tool, or of every tool when omitted. Not scoped: `mise prune` goes by all
     // the configs mise has tracked.
     function prune(tool) {
-        run(["prune", "--tools", "--yes"].concat(tool ? [tool] : []), tool ? "Pruning " + tool : "Pruning unused versions", tool ? "Pruned " + tool : "Pruned unused versions");
-    }
-
-    function pushLog(line) {
-        const t = line.trim();
-        if (t && !t.startsWith("DEBUG"))   // MISE_VERBOSE noise
-            jobLog = jobLog.concat([t]).slice(-40);
-    }
-
-    // the useful lines of a failed job (the tail is mostly mise's own "Version:/Location:" footer)
-    function failureSummary() {
-        if (jobLog.some(l => /No lockfile URL|not in the lockfile/.test(l)))
-            return "`locked = true`: mise installs nothing the lockfile lacks. Add the tool to your mise config, run `mise lock`, then `mise install` (or turn on Install with `locked` off in Settings).";
-        const hit = jobLog.filter(l => /×|│|ERROR|hint:|failed|mismatch|not found|denied|404|403/i.test(l) && !/Version:|--verbose|BACKTRACE/i.test(l));
-        return (hit.length ? hit : jobLog).slice(-4).join("\n");
+        MiseJobs.run(["prune", "--tools", "--yes"].concat(tool ? [tool] : []), tool ? "Pruning " + tool : "Pruning unused versions", tool ? "Pruned " + tool : "Pruned unused versions");
     }
 
     Component.onCompleted: {
@@ -762,53 +731,6 @@ Item {
                     backend: p.slice(1).join(" ")
                 };
             })
-        }
-    }
-
-    Process {
-        id: jobProc
-        property string doneMsg: ""
-        property var queue: []   // commands still to run after this one
-        property var fallback: []   // see runMany
-        // verbose so a failure carries the backend's own reason (aube/npm/uv...), not just "exit code 1".
-        // With `locked = true` mise refuses `use` for a tool the lockfile does not know (No lockfile URL found).
-        // Only when the user allows it in Settings, `use` runs unlocked and mise writes the lockfile entries.
-        function prepare(args) {
-            environment = Object.assign({
-                MISE_VERBOSE: "1"
-            }, args[0] === "use" && root.installUnlocked ? {
-                MISE_LOCKED: "0"
-            } : {});
-            command = args[0] === "sh" ? args : ["mise"].concat(args);
-        }
-        stdout: SplitParser {
-            onRead: l => root.pushLog(l)
-        }
-        stderr: SplitParser {
-            onRead: l => root.pushLog(l)
-        }
-        onExited: code => {
-            if (code !== 0 && fallback.length && !root.installUnlocked && root.jobLog.some(l => /No lockfile URL|not in the lockfile/.test(l))) {
-                const f = fallback;
-                fallback = [];
-                root.jobLog = [];
-                prepare(f);
-                Qt.callLater(() => jobProc.running = true);
-                return;
-            }
-            if (code === 0 && queue.length) {
-                prepare(queue[0]);
-                queue = queue.slice(1);
-                Qt.callLater(() => jobProc.running = true);
-                return;
-            }
-            root.busy = false;
-            if (code === 0)
-                ToastService.showInfo("mise", doneMsg);
-            else
-                ToastService.showError("mise failed", root.failureSummary());
-            root.refresh();
-            root.refreshInfo();
         }
     }
 }
