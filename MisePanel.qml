@@ -291,7 +291,7 @@ Item {
         interval: 600
         onTriggered: {
             if (pop.httpReady && pop.tab === 1)
-                MiseService.checkHttp(pop.httpSpec);
+                MiseInfo.checkHttp(pop.httpSpec);
         }
     }
     readonly property bool httpReady: httpName.trim() !== "" && httpUrl.trim() !== "" && httpList.trim() !== ""
@@ -923,7 +923,7 @@ Item {
                 property bool confirm: false   // remove is two-step
                 readonly property string key: modelData.name + "|" + modelData.scope
                 readonly property bool open: pop.openRow === key
-                readonly property var info: MiseService.info[MiseService.infoKey(modelData.name, modelData.scope)] || ({})
+                readonly property var info: MiseInfo.info[MiseInfo.infoKey(modelData.name, modelData.scope)] || ({})
                 readonly property var unused: MiseService.prunable[MiseService.bareName(modelData.name)] || []
                 // `latest` first, then the latest versions, plus installed ones too old to be among them (so they can be removed)
                 readonly property var chipVersions: {
@@ -1009,7 +1009,7 @@ Item {
                     onClicked: {
                         pop.openRow = row.open ? "" : row.key;
                         if (row.open)
-                            MiseService.loadInfo(modelData.name, modelData.scope);
+                            MiseInfo.loadInfo(modelData.name, modelData.scope);
                     }
                 }
                 DankActionButton {
@@ -1215,7 +1215,7 @@ Item {
                     StyledText {
                         width: parent.width
                         visible: pop.httpReady
-                        readonly property var chk: MiseService.httpCheck
+                        readonly property var chk: MiseInfo.httpCheck
                         readonly property bool fresh: chk.spec === pop.httpSpec
                         text: !fresh || chk.pending ? "Checking the version list…" : chk.latest ? "✓ latest resolves to " + chk.latest : "✗ No versions found: check the list URL, the path and the regex"
                         wrapMode: Text.Wrap
