@@ -510,96 +510,14 @@ Item {
             spacing: Theme.spacingXS
             model: pop.updList
 
-            delegate: Rectangle {
+            delegate: MiseUpdateRow {
                 required property var modelData
                 width: ListView.view ? ListView.view.width : 0
-                height: pop.rowH
-                radius: Theme.cornerRadius
-                color: updHover.containsMouse ? Theme.primaryHoverLight : "transparent"
-                MouseArea {
-                    id: updHover
-                    anchors.fill: parent
-                    hoverEnabled: true
-                }
-                DankIcon {
-                    id: updIcon
-                    anchors.left: parent.left
-                    anchors.leftMargin: Theme.spacingM
-                    anchors.verticalCenter: parent.verticalCenter
-                    name: modelData.ignoredKey ? "visibility_off" : (modelData.bump ? "upgrade" : "arrow_circle_up")
-                    size: Theme.iconSize - 4
-                    color: modelData.ignoredKey ? Theme.surfaceVariantText : (modelData.bump ? Theme.warning : Theme.primary)
-                }
-                Column {
-                    anchors.left: updIcon.right
-                    anchors.leftMargin: Theme.spacingM
-                    anchors.right: updBtns.left
-                    anchors.rightMargin: Theme.spacingS
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 1
-                    StyledText {
-                        width: parent.width
-                        text: modelData.name
-                        font.pixelSize: Theme.fontSizeMedium
-                        font.weight: Font.Medium
-                        color: modelData.ignoredKey ? Theme.surfaceVariantText : Theme.surfaceText
-                        elide: Text.ElideRight
-                        wrapMode: Text.NoWrap
-                        maximumLineCount: 1
-                    }
-                    StyledText {
-                        width: parent.width
-                        text: modelData.ignoredKey ? (modelData.latest ? "skipping " + modelData.latest : "ignored · all versions") : (modelData.current ? modelData.current + " → " : "not installed → ") + modelData.latest + (modelData.bump ? " · bump (requested " + modelData.requested + ")" : "") + (pop.showScope ? " · " + MiseProjects.label(modelData.scope) : "")
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.surfaceVariantText
-                        elide: Text.ElideRight
-                        wrapMode: Text.NoWrap
-                        maximumLineCount: 1
-                    }
-                }
-                Row {
-                    id: updBtns
-                    anchors.right: parent.right
-                    anchors.rightMargin: Theme.spacingXS
-                    anchors.verticalCenter: parent.verticalCenter
-                    DankActionButton {
-                        visible: !!modelData.ignoredKey
-                        buttonSize: pop.iconBtn
-                        iconSize: pop.actionIcon
-                        iconName: "undo"
-                        iconColor: Theme.primary
-                        tooltipText: "Stop ignoring"
-                        onClicked: MiseService.unignore(modelData.ignoredKey)
-                    }
-                    DankActionButton {
-                        visible: !modelData.ignoredKey
-                        buttonSize: pop.iconBtn
-                        iconSize: pop.actionIcon
-                        iconName: "skip_next"
-                        iconColor: Theme.surfaceVariantText
-                        tooltipText: "Skip " + modelData.latest + " (shows again with a newer version)"
-                        onClicked: MiseService.ignore(modelData.name, modelData.latest)
-                    }
-                    DankActionButton {
-                        visible: !modelData.ignoredKey
-                        buttonSize: pop.iconBtn
-                        iconSize: pop.actionIcon
-                        iconName: "visibility_off"
-                        iconColor: Theme.surfaceVariantText
-                        tooltipText: "Ignore " + modelData.name + " (all versions)"
-                        onClicked: MiseService.ignore(modelData.name, "")
-                    }
-                    DankActionButton {
-                        visible: !modelData.ignoredKey
-                        buttonSize: pop.iconBtn
-                        iconSize: pop.actionIcon
-                        iconName: modelData.bump ? "upgrade" : "download"
-                        iconColor: modelData.bump ? Theme.warning : Theme.primary
-                        tooltipText: modelData.bump ? "Bump: rewrites \"" + modelData.requested + "\" in your " + (modelData.scope ? "project's" : "global") + " mise config" : (modelData.current ? "Update" : "Install")
-                        enabled: !MiseJobs.busy
-                        onClicked: modelData.bump ? MiseService.bump(modelData.name, modelData.scope) : MiseService.upgrade(modelData.name, modelData.scope)
-                    }
-                }
+                row: modelData
+                showScope: pop.showScope
+                rowH: pop.rowH
+                iconBtn: pop.iconBtn
+                actionIcon: pop.actionIcon
             }
         }
 
