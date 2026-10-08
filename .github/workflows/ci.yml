@@ -128,3 +128,19 @@ jobs:
             --import disable --unresolved-type disable --unqualified disable \
             --missing-property disable --missing-type disable \
             --compiler disable *.qml
+
+  node-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # v31.11.1
+      # yamllint disable-line rule:line-length
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24
+
+      # Pure logic (MiseSearch.js) against recorded API answers in tests/fixtures.
+      # Standard library only: no package.json, no dependencies.
+      - name: node --test
+        env:
+          NIXPKGS: github:NixOS/nixpkgs/aa48d347080940b8a2b8d2f48228674e280a3514
+        run: nix shell "$NIXPKGS#nodejs" -c node --test

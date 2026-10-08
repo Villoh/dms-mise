@@ -1,0 +1,144 @@
+{
+  "results": [
+    {
+      "kind": "PACKAGE",
+      "name": "ruff",
+      "system": "PYPI",
+      "defaultVersion": "0.16.10",
+      "projectKey": null
+    },
+    {
+      "kind": "PROJECT",
+      "name": "ruffythemonkey/ipdnsdomain",
+      "system": null,
+      "defaultVersion": null,
+      "projectKey": null
+    },
+    {
+      "kind": "PROJECT",
+      "name": "ruffythemonkey/tldextractor",
+      "system": null,
+      "defaultVersion": null,
+      "projectKey": null
+    },
+    {
+      "kind": "PROJECT",
+      "name": "ruffythemonkey/tldextract",
+      "system": null,
+      "defaultVersion": null,
+      "projectKey": null
+    },
+    {
+      "kind": "PROJECT",
+      "name": "astral-sh/ruff",
+      "system": null,
+      "defaultVersion": null,
+      "projectKey": null
+    },
+    {
+      "kind": "PROJECT",
+      "name": "charliermarsh/ruff",
+      "system": null,
+      "defaultVersion": null,
+      "projectKey": null
+    },
+    {
+      "kind": "PROJECT",
+      "name": "ruffythemonkey/bussycontrol",
+      "system": null,
+      "defaultVersion": null,
+      "projectKey": null
+    },
+    {
+      "kind": "PROJECT",
+      "name": "ruffk/zwiftpacketmonitor",
+      "system": null,
+      "defaultVersion": null,
+      "projectKey": null
+    },
+    {
+      "kind": "PROJECT",
+      "name": "ruffk/hotkeylistener",
+      "system": null,
+      "defaultVersion": null,
+      "projectKey": null
+    },
+    {
+      "kind": "PACKAGE",
+      "name": "ruff-lsp",
+      "system": "PYPI",
+      "defaultVersion": "0.0.62",
+      "projectKey": null
+    },
+    {
+      "kind": "PROJECT",
+      "name": "ruffythemonkey/animecoverimage",
+      "system": null,
+      "defaultVersion": null,
+      "projectKey": null
+    },
+    {
+      "kind": "PROJECT",
+      "name": "ruffythemonkey/ruffys.hostingextensions",
+      "system": null,
+      "defaultVersion": null,
+      "projectKey": null
+    },
+    {
+      "kind": "PACKAGE",
+      "name": "ruffus",
+      "system": "PYPI",
+      "defaultVersion": "2.8.4",
+      "projectKey": null
+    },
+    {
+      "kind": "PROJECT",
+      "name": "ruffkat/webdevice",
+      "system": null,
+      "defaultVersion": null,
+      "projectKey": null
+    },
+    {
+      "kind": "PACKAGE",
+      "name": "ruff-api",
+      "system": "PYPI",
+      "defaultVersion": "0.2.1",
+      "projectKey": null
+    },
+    {
+      "kind": "PROJECT",
+      "name": "astral-sh/ruff-lsp",
+      "system": null,
+      "defaultVersion": null,
+      "projectKey": null
+    },
+    {
+      "kind": "PROJECT",
+      "name": "charliermarsh/ruff-lsp",
+      "system": null,
+      "defaultVersion": null,
+      "projectKey": null
+    },
+    {
+      "kind": "PROJECT",
+      "name": "ruffle-rs/ruffle",
+      "system": null,
+      "defaultVersion": null,
+      "projectKey": null
+    },
+    {
+      "kind": "PROJECT",
+      "name": "ruffel/invoke",
+      "system": null,
+      "defaultVersion": null,
+      "projectKey": null
+    },
+    {
+      "kind": "PROJECT",
+      "name": "rufflewind/tokio-file-unix",
+      "system": null,
+      "defaultVersion": null,
+      "projectKey": null
+    }
+  ]
+}

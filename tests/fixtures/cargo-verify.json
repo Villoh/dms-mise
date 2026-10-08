@@ -1,0 +1,6 @@
+{
+  "crate": {
+    "name": "ripgrep",
+    "description": "ripgrep is a line-oriented search tool that recursively searches the current\ndirectory for a regex pattern while respecting gitignore rules. ripgrep has\nfirst class support on Windows, macOS and Linux.\n"
+  }
+}

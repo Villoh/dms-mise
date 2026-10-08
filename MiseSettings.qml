@@ -139,7 +139,7 @@ PluginSettings {
     }
 
     SelectionSetting {
-        visible: MiseService.projectsMode !== "off"
+        visible: MiseProjects.mode !== "off"
         settingKey: "badgeScope"
         label: "Bar badge counts"
         description: "Global: only the global config, as before. Global + projects: also the updates and bumps of the projects you follow. The popout always shows the scope you pick there."
@@ -162,15 +162,15 @@ PluginSettings {
         width: parent.width
         spacing: Theme.spacingS
 
-        readonly property bool active: MiseService.projectsMode !== "off"
+        readonly property bool active: MiseProjects.mode !== "off"
 
         Connections {
-            target: MiseService
-            function onProjectAdded(path) {
+            target: MiseProjects
+            function onAdded(path) {
                 pathField.text = "";
                 addError.text = "";
             }
-            function onProjectAddFailed(message) {
+            function onAddFailed(message) {
                 addError.text = message;
             }
         }
@@ -201,7 +201,7 @@ PluginSettings {
                 leftIconName: "folder"
                 placeholderText: "~/code/my-project"
                 onTextEdited: addError.text = ""
-                onAccepted: MiseService.addProject(text)
+                onAccepted: MiseProjects.add(text)
             }
 
             DankButton {
@@ -219,7 +219,7 @@ PluginSettings {
                 text: "Add"
                 iconName: "add"
                 buttonHeight: pathField.height
-                onClicked: MiseService.addProject(pathField.text)
+                onClicked: MiseProjects.add(pathField.text)
             }
         }
 
@@ -234,7 +234,7 @@ PluginSettings {
 
         StyledText {
             width: parent.width
-            visible: projectsSection.active && MiseService.projects.length === 0
+            visible: projectsSection.active && MiseProjects.manual.length === 0
             text: "No projects added."
             font.pixelSize: Theme.fontSizeSmall
             color: Theme.surfaceVariantText
@@ -242,10 +242,10 @@ PluginSettings {
 
         // your list, then the tracked ones you hid (undo)
         Repeater {
-            model: projectsSection.active ? MiseService.projects.map(p => ({
+            model: projectsSection.active ? MiseProjects.manual.map(p => ({
                         path: p,
                         hidden: false
-                    })).concat(MiseService.projectsMode === "tracked" ? MiseService.hiddenProjects.filter(p => MiseService.trackedProjects.includes(p) && !MiseService.projects.includes(p)).map(p => ({
+                    })).concat(MiseProjects.mode === "tracked" ? MiseProjects.hidden.filter(p => MiseProjects.tracked.includes(p) && !MiseProjects.manual.includes(p)).map(p => ({
                         path: p,
                         hidden: true
                     })) : []) : []
@@ -262,7 +262,7 @@ PluginSettings {
                     anchors.right: rowBtn.left
                     anchors.rightMargin: Theme.spacingS
                     anchors.verticalCenter: parent.verticalCenter
-                    text: MiseService.scopeLabel(modelData.path) + "  ·  " + modelData.path + (modelData.hidden ? "  ·  hidden" : "")
+                    text: MiseProjects.label(modelData.path) + "  ·  " + modelData.path + (modelData.hidden ? "  ·  hidden" : "")
                     font.pixelSize: Theme.fontSizeSmall
                     color: modelData.hidden ? Theme.surfaceVariantText : Theme.surfaceText
                     elide: Text.ElideMiddle
@@ -280,7 +280,7 @@ PluginSettings {
                     iconName: modelData.hidden ? "undo" : "close"
                     iconColor: modelData.hidden ? Theme.primary : Theme.surfaceVariantText
                     tooltipText: modelData.hidden ? "Follow again" : "Stop following"
-                    onClicked: modelData.hidden ? MiseService.showProject(modelData.path) : MiseService.removeProject(modelData.path)
+                    onClicked: modelData.hidden ? MiseProjects.show(modelData.path) : MiseProjects.remove(modelData.path)
                 }
             }
         }
@@ -294,7 +294,7 @@ PluginSettings {
         folderMode: true
         showHiddenFiles: true
         onFileSelected: path => {
-            MiseService.addProject(MiseService.plainPath(path));
+            MiseProjects.add(MiseService.plainPath(path));
             close();
         }
     }
@@ -305,19 +305,11 @@ PluginSettings {
         width: parent.width
         spacing: Theme.spacingS
 
-        property var entries: PluginService.loadPluginState("mise", "ignored", []) || []
+        readonly property var entries: MiseService.ignored
 
         function label(k) {
             const m = k.match(/^(.*)@([^\/@:]+)$/);
             return m ? m[1] + "  ·  skipping " + m[2] : k + "  ·  all versions";
-        }
-
-        Connections {
-            target: PluginService
-            function onPluginStateChanged(pluginId) {
-                if (pluginId === "mise")
-                    ignoredSection.entries = PluginService.loadPluginState("mise", "ignored", []) || [];
-            }
         }
 
         Item {
@@ -340,7 +332,7 @@ PluginSettings {
                 text: "Clear all"
                 iconName: "delete_sweep"
                 buttonHeight: Theme.iconSize + Theme.spacingS
-                onClicked: PluginService.savePluginState("mise", "ignored", [])
+                onClicked: MiseService.clearIgnored()
             }
         }
 
@@ -392,7 +384,7 @@ PluginSettings {
                     iconName: "undo"
                     iconColor: Theme.primary
                     tooltipText: "Stop ignoring"
-                    onClicked: PluginService.savePluginState("mise", "ignored", ignoredSection.entries.filter(k => k !== modelData))
+                    onClicked: MiseService.unignore(modelData)
                 }
             }
         }

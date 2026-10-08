@@ -1,0 +1,27 @@
+[
+  {
+    "name": "rails",
+    "info": "Ruby on Rails is a full-stack web framework optimized for programmer happiness and sustainable productivity. It encourages beautiful code by favoring convention over configuration.",
+    "version": "8.1.4"
+  },
+  {
+    "name": "rails-i18n",
+    "info": "A set of common locale data and translations to internationalize and/or localize your Rails applications.",
+    "version": "8.1.0"
+  },
+  {
+    "name": "rails-html-sanitizer",
+    "info": "HTML sanitization for Rails applications",
+    "version": "1.7.1"
+  },
+  {
+    "name": "rails-dom-testing",
+    "info": "This gem can compare doms and assert certain elements exists in doms using Nokogiri.",
+    "version": "2.3.0"
+  },
+  {
+    "name": "rails-erd",
+    "info": "Automatically generate an entity-relationship diagram (ERD) for your Rails models.",
+    "version": "2.2.0"
+  }
+]

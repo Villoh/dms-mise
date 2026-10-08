@@ -1,0 +1,15 @@
+{
+  "name": "ripgrep",
+  "owner": {
+    "company": "",
+    "location": "",
+    "login": "conda-forge",
+    "name": "conda-forge",
+    "url": "",
+    "description": "A community-led collection of recipes, build infrastructure, and distributions for the conda package manager.",
+    "created_at": "2015-04-11 10:15:08.727000+00:00",
+    "user_type": "org"
+  },
+  "summary": "ripgrep recursively searches directories for a regex pattern",
+  "description": ""
+}

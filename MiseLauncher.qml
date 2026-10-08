@@ -25,12 +25,21 @@ QtObject {
         function onInstalledChanged() {
             root.poke();
         }
-        function onProjectDataChanged() {
-            root.poke();
-        }
         function onCheckingChanged() {
             root.poke();
         }
+    }
+
+    property Connections projects: Connections {
+        target: MiseProjects
+        function onByScopeChanged() {
+            root.poke();
+        }
+    }
+
+    // remote hits, exact-name checks and their notices land later too
+    property Connections remote: Connections {
+        target: MiseRemote
         function onRemoteChanged() {
             root.poke();
         }
@@ -60,13 +69,13 @@ QtObject {
 
     // " · project" next to rows that belong to a project config
     function where(scope) {
-        return scope ? " · " + MiseService.scopeLabel(scope) : "";
+        return scope ? " · " + MiseProjects.label(scope) : "";
     }
 
     function getItems(query) {
         const raw = (query || "").trim();   // search() needs the original case: github:Owner/Repo, [opts]
         const q = raw.toLowerCase();
-        MiseService.lookup(raw);   // debounced npm / crates.io / GitHub lookup; results arrive via onRemoteChanged
+        MiseRemote.lookup(raw);   // debounced npm / crates.io / GitHub lookup; results arrive via onRemoteChanged
         const items = [];
         const out = MiseService.outdated.filter(t => t.name.toLowerCase().includes(q));
 
@@ -101,7 +110,7 @@ QtObject {
                 action: (r.installed ? "installed:" : "install:") + r.name,
                 categories: ["mise"]
             }));
-        if (q && MiseService.lookingUp)
+        if (q && MiseRemote.lookingUp)
             items.push({
                 name: "Searching…",
                 icon: "material:sync",
@@ -110,7 +119,7 @@ QtObject {
                 categories: ["mise"]
             });
         if (q)
-            MiseService.notices.forEach(n => items.push({
+            MiseRemote.notices.forEach(n => items.push({
                     name: n,
                     icon: "material:cloud_off",
                     comment: "results from it are missing",
@@ -140,9 +149,9 @@ QtObject {
             return [];
         const tool = a.substring(a.indexOf(":") + 1);
         const out = [];
-        [""].concat(MiseService.scopes).forEach(s => {
+        [""].concat(MiseProjects.scopes).forEach(s => {
             const here = s ? tool in MiseService.toolsIn(s) : MiseService.installed.includes(tool) || MiseService.missing.includes(tool);
-            const loc = s ? " in " + MiseService.scopeLabel(s) : (MiseService.scopes.length ? " globally" : "");
+            const loc = s ? " in " + MiseProjects.label(s) : (MiseProjects.scopes.length ? " globally" : "");
             // plain `Install` stays the main action of install rows; the menu only adds the project ones
             if (!here && !s && a.startsWith("install:"))
                 return;

@@ -1,0 +1,104 @@
+[
+  {
+    "name": "ripgrep",
+    "owner": "anaconda",
+    "summary": "ripgrep recursively searches directories for a regex pattern while respecting your gitignore",
+    "full_name": "anaconda/ripgrep"
+  },
+  {
+    "name": "ripgrep",
+    "owner": "ostrokach-forge",
+    "summary": "ripgrep recursively searches directories for a regex pattern.",
+    "full_name": "ostrokach-forge/ripgrep"
+  },
+  {
+    "name": "ripgrep",
+    "owner": "dhirschfeld",
+    "summary": "ripgrep recursively searches directories for a regex pattern",
+    "full_name": "dhirschfeld/ripgrep"
+  },
+  {
+    "name": "ripgrep",
+    "owner": "conda-forge",
+    "summary": "ripgrep recursively searches directories for a regex pattern",
+    "full_name": "conda-forge/ripgrep"
+  },
+  {
+    "name": "ripgrep",
+    "owner": "rdonnelly",
+    "summary": "",
+    "full_name": "rdonnelly/ripgrep"
+  },
+  {
+    "name": "ripgrep",
+    "owner": "scw",
+    "summary": "ripgrep is a fast command line tool for searching through files",
+    "full_name": "scw/ripgrep"
+  },
+  {
+    "name": "ripgrep",
+    "owner": "cdat-forge",
+    "summary": "ripgrep recursively searches directories for a regex pattern",
+    "full_name": "cdat-forge/ripgrep"
+  },
+  {
+    "name": "ripgrep",
+    "owner": "main",
+    "summary": "ripgrep recursively searches directories for a regex pattern while respecting your gitignore",
+    "full_name": "main/ripgrep"
+  },
+  {
+    "name": "ripgrep",
+    "owner": "prometeia",
+    "summary": "ripgrep recursively searches directories for a regex pattern",
+    "full_name": "prometeia/ripgrep"
+  },
+  {
+    "name": "ripgrep",
+    "owner": "aarch64-staging",
+    "summary": "ripgrep recursively searches directories for a regex pattern",
+    "full_name": "aarch64-staging/ripgrep"
+  },
+  {
+    "name": "ripgrep",
+    "owner": "jasonb857",
+    "summary": "ripgrep recursively searches directories for a regex pattern",
+    "full_name": "jasonb857/ripgrep"
+  },
+  {
+    "name": "ripgrep",
+    "owner": "e8035669acarmv7",
+    "summary": "ripgrep recursively searches directories for a regex pattern",
+    "full_name": "e8035669acarmv7/ripgrep"
+  },
+  {
+    "name": "ripgrep",
+    "owner": "AnacondaProserve",
+    "summary": "ripgrep recursively searches directories for a regex pattern while respecting your gitignore",
+    "full_name": "AnacondaProserve/ripgrep"
+  },
+  {
+    "name": "ripgrep",
+    "owner": "Anaconda-python-gte-3.10",
+    "summary": "ripgrep recursively searches directories for a regex pattern while respecting your gitignore",
+    "full_name": "Anaconda-python-gte-3.10/ripgrep"
+  },
+  {
+    "name": "ripgrep",
+    "owner": "bootstrap-win-arm64-round-2-native",
+    "summary": "ripgrep recursively searches directories for a regex pattern while respecting your gitignore",
+    "full_name": "bootstrap-win-arm64-round-2-native/ripgrep"
+  },
+  {
+    "name": "ripgrep-all",
+    "owner": "conda-forge",
+    "summary": "Wrapper around ripgrep that adds multiple rich file types",
+    "full_name": "conda-forge/ripgrep-all"
+  },
+  {
+    "name": "ripgrepy",
+    "owner": "conda-forge",
+    "summary": "python module for ripgrep",
+    "full_name": "conda-forge/ripgrepy"
+  }
+]
