@@ -25,10 +25,14 @@ QtObject {
         function onInstalledChanged() {
             root.poke();
         }
-        function onProjectDataChanged() {
+        function onCheckingChanged() {
             root.poke();
         }
-        function onCheckingChanged() {
+    }
+
+    property Connections projects: Connections {
+        target: MiseProjects
+        function onByScopeChanged() {
             root.poke();
         }
     }
@@ -65,7 +69,7 @@ QtObject {
 
     // " · project" next to rows that belong to a project config
     function where(scope) {
-        return scope ? " · " + MiseService.scopeLabel(scope) : "";
+        return scope ? " · " + MiseProjects.label(scope) : "";
     }
 
     function getItems(query) {
@@ -145,9 +149,9 @@ QtObject {
             return [];
         const tool = a.substring(a.indexOf(":") + 1);
         const out = [];
-        [""].concat(MiseService.scopes).forEach(s => {
+        [""].concat(MiseProjects.scopes).forEach(s => {
             const here = s ? tool in MiseService.toolsIn(s) : MiseService.installed.includes(tool) || MiseService.missing.includes(tool);
-            const loc = s ? " in " + MiseService.scopeLabel(s) : (MiseService.scopes.length ? " globally" : "");
+            const loc = s ? " in " + MiseProjects.label(s) : (MiseProjects.scopes.length ? " globally" : "");
             // plain `Install` stays the main action of install rows; the menu only adds the project ones
             if (!here && !s && a.startsWith("install:"))
                 return;

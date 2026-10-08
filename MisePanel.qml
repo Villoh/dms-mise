@@ -46,7 +46,7 @@ Item {
         onTriggered: pop.checkingShown = false
     }
 
-    readonly property string summary: MiseService.error || MiseService.scopeWarning(scope) || ((count > 0 ? count + " outdated" : (MiseService.scopes.length ? scopeName + " is up to date" : "All up to date")) + (bumpCount ? " · " + bumpCount + " bumpable" : "") + " · " + installedRows.filter(r => r.installed).length + " installed" + checkedText)
+    readonly property string summary: MiseService.error || MiseService.scopeWarning(scope) || ((count > 0 ? count + " outdated" : (MiseProjects.scopes.length ? scopeName + " is up to date" : "All up to date")) + (bumpCount ? " · " + bumpCount + " bumpable" : "") + " · " + installedRows.filter(r => r.installed).length + " installed" + checkedText)
 
     // on open. "updates" / "tools" are fixed; anything else is auto:
     // Updates if something is pending (updates or bumps), Tools otherwise
@@ -75,7 +75,7 @@ Item {
     }
     // where Install writes: the picked scope, global when looking at everything
     readonly property string target: scope === "*" ? "" : scope
-    readonly property bool showScope: scope === "*" && MiseService.scopes.length > 0
+    readonly property bool showScope: scope === "*" && MiseProjects.scopes.length > 0
     readonly property var scopeOptions: [
         {
             key: "",
@@ -85,11 +85,11 @@ Item {
             key: "*",
             label: "All"
         }
-    ].concat(MiseService.scopes.map(s => ({
+    ].concat(MiseProjects.scopes.map(s => ({
                 key: s,
-                label: MiseService.scopeLabel(s)
+                label: MiseProjects.label(s)
             })))
-    readonly property string scopeName: scope === "*" ? "All" : scope === "" ? "Global" : MiseService.scopeLabel(scope)
+    readonly property string scopeName: scope === "*" ? "All" : scope === "" ? "Global" : MiseProjects.label(scope)
     function inScope(r) {
         return scope === "*" || r.scope === scope;
     }
@@ -147,14 +147,14 @@ Item {
     // tools tab: every tool of the picked scope(s), one row per tool and scope
     readonly property var installedRows: {
         const out = [];
-        (scope === "*" ? [""].concat(MiseService.scopes) : [scope]).forEach(s => {
+        (scope === "*" ? [""].concat(MiseProjects.scopes) : [scope]).forEach(s => {
             const v = MiseService.toolsIn(s);
             MiseService.installedIn(s).forEach(n => out.push({
                     name: n,
                     scope: s,
                     installed: true,
                     direct: false,
-                    sub: (v[n] || "") + (showScope ? (v[n] ? " · " : "") + MiseService.scopeLabel(s) : "")
+                    sub: (v[n] || "") + (showScope ? (v[n] ? " · " : "") + MiseProjects.label(s) : "")
                 }));
             // declared but not installed: listed apart, with the install button
             MiseService.missingIn(s).forEach(n => out.push({
@@ -163,7 +163,7 @@ Item {
                     installed: false,
                     missing: true,
                     direct: false,
-                    sub: (v[n] || "") + " · not installed" + (showScope ? " · " + MiseService.scopeLabel(s) : "")
+                    sub: (v[n] || "") + " · not installed" + (showScope ? " · " + MiseProjects.label(s) : "")
                 }));
         });
         return out.sort((a, b) => a.name.localeCompare(b.name) || a.scope.localeCompare(b.scope));
@@ -206,7 +206,7 @@ Item {
                     scope: target,
                     installed: false,
                     direct: r.direct,
-                    sub: r.backend + (scope === "*" && MiseService.scopes.length ? " · installs globally" : "")
+                    sub: r.backend + (scope === "*" && MiseProjects.scopes.length ? " · installs globally" : "")
                 })));
     }
     readonly property int shown: tab === 0 ? updList.length : toolList.length
@@ -320,7 +320,7 @@ Item {
         // scope picker: one compact button instead of a chip row, so it scales to any number of projects
         Rectangle {
             id: scopeBtn
-            visible: MiseService.projectsMode !== "off"
+            visible: MiseProjects.mode !== "off"
             anchors.right: refreshBtn.left
             anchors.rightMargin: Theme.spacingXS
             anchors.verticalCenter: parent.verticalCenter
@@ -388,7 +388,7 @@ Item {
             property bool armed: false
             readonly property var target: MiseService.warnedScope(pop.scope)   // undefined = nothing to fix
             readonly property string kind: target === undefined ? "" : MiseService.warnOf(target)
-            readonly property string label: target === undefined ? "" : MiseService.scopeLabel(target)
+            readonly property string label: target === undefined ? "" : MiseProjects.label(target)
             visible: kind !== ""
             anchors.right: scopeBtn.visible ? scopeBtn.left : refreshBtn.left
             anchors.rightMargin: Theme.spacingXS
@@ -526,18 +526,18 @@ Item {
     }
 
     Connections {
-        target: MiseService
+        target: MiseProjects
         function onScopesChanged() {
-            if (pop.scope !== "*" && pop.scope !== "" && !MiseService.scopes.includes(pop.scope))
+            if (pop.scope !== "*" && pop.scope !== "" && !MiseProjects.scopes.includes(pop.scope))
                 pop.scope = "";
         }
-        function onProjectsModeChanged() {
-            if (MiseService.projectsMode === "off") {
+        function onModeChanged() {
+            if (MiseProjects.mode === "off") {
                 pop.scope = "";
                 pop.closeMenu();
             }
         }
-        function onProjectAdded(path) {
+        function onAdded(path) {
             if (!pop.addPending)
                 return;
             pop.addPending = false;
@@ -854,7 +854,7 @@ Item {
                     }
                     StyledText {
                         width: parent.width
-                        text: modelData.ignoredKey ? (modelData.latest ? "skipping " + modelData.latest : "ignored · all versions") : (modelData.current ? modelData.current + " → " : "not installed → ") + modelData.latest + (modelData.bump ? " · bump (requested " + modelData.requested + ")" : "") + (pop.showScope ? " · " + MiseService.scopeLabel(modelData.scope) : "")
+                        text: modelData.ignoredKey ? (modelData.latest ? "skipping " + modelData.latest : "ignored · all versions") : (modelData.current ? modelData.current + " → " : "not installed → ") + modelData.latest + (modelData.bump ? " · bump (requested " + modelData.requested + ")" : "") + (pop.showScope ? " · " + MiseProjects.label(modelData.scope) : "")
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.surfaceVariantText
                         elide: Text.ElideRight
@@ -1524,7 +1524,7 @@ Item {
                                 iconName: "close"
                                 iconColor: Theme.surfaceVariantText
                                 tooltipText: "Stop following (the config file is not touched)"
-                                onClicked: MiseService.removeProject(modelData.key)
+                                onClicked: MiseProjects.remove(modelData.key)
                             }
                         }
                     }
@@ -1601,7 +1601,7 @@ Item {
                     onTextEdited: addErr.text = ""
                     onAccepted: {
                         pop.addPending = true;
-                        MiseService.addProject(text);
+                        MiseProjects.add(text);
                     }
                 }
                 StyledText {
@@ -1627,7 +1627,7 @@ Item {
         showHiddenFiles: true
         onFileSelected: path => {
             pop.addPending = true;
-            MiseService.addProject(MiseService.plainPath(path));
+            MiseProjects.add(MiseService.plainPath(path));
             close();
         }
     }

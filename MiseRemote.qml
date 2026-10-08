@@ -11,7 +11,7 @@ import "MiseSearch.js" as Search
 Item {
     id: root
 
-    property bool enabled: true   // query npm / crates.io / GitHub as you type (Settings "remoteSearch")
+    property bool remoteSearch: true   // query npm / crates.io / GitHub as you type (Settings)
     property string lookupQ: ""       // last query handed to lookup()
     property var remoteHits: ({})     // backend -> [{name: "npm:foo", backend, desc}], from the last answer
     readonly property var remote: Search.backends.reduce((a, k) => a.concat(remoteHits[k] || []), [])
@@ -33,10 +33,10 @@ Item {
             if (e && !(by[e] || []).includes(k))
                 (by[e] = by[e] || []).push(k);
         };
-        Search.searchTargets(lookupQ, enabled).forEach(k => add(k, lastError[k]));
+        Search.searchTargets(lookupQ, remoteSearch).forEach(k => add(k, lastError[k]));
         // the exact-name check of what is typed, also for backends that are only verified (github:owner/repo)
         const p = Search.splitQuery(lookupQ);
-        if (enabled && p.b)
+        if (remoteSearch && p.b)
             add(p.b, unchecked[p.bare]);
         return Object.keys(by).map(e => by[e].join(", ") + " didn't answer · " + e);
     }
@@ -47,7 +47,7 @@ Item {
 
     function loadSettings() {
         const r = PluginService.loadPluginData("mise", "remoteSearch", true);
-        enabled = !(r === false || r === "false");
+        remoteSearch = !(r === false || r === "false");
     }
 
     Connections {
@@ -69,7 +69,7 @@ Item {
         lookupQ = q;
         if (!q)
             remoteHits = ({});
-        if (enabled && q.length >= 2)
+        if (remoteSearch && q.length >= 2)
             lookingUp = true;
         lookupTimer.restart();
         if (!lookupTimer.running || q.length < 2)
@@ -78,13 +78,13 @@ Item {
 
     // clear lookingUp once the debounce is over and no request is in flight
     function settle() {
-        lookingUp = enabled && lookupQ.length >= 2 && (lookupTimer.running || (tokenAsked && !tokenReady) || verifyFetch.running || Object.keys(fetchers).some(k => fetchers[k].running));
+        lookingUp = remoteSearch && lookupQ.length >= 2 && (lookupTimer.running || (tokenAsked && !tokenReady) || verifyFetch.running || Object.keys(fetchers).some(k => fetchers[k].running));
     }
 
     // what to ask the network for this query
     function fetchRemote() {
         const q = lookupQ;
-        if (!enabled || q.length < 2)
+        if (!remoteSearch || q.length < 2)
             return;
         const p = Search.splitQuery(q);
         // typed backend:tool -> does it exist? (git+/URL specs are not checked)
@@ -94,7 +94,7 @@ Item {
         // always ask, even when the registry has the name: skipping would leave the hits of an
         // earlier, shorter query on screen and the list would depend on how you typed
         const n = p.b ? Search.maxPrefixed : Search.maxFree;
-        Search.searchTargets(q, enabled).forEach(k => fetchers[k].start(Search.searchers[k].url(p.t, n), p.t));
+        Search.searchTargets(q, remoteSearch).forEach(k => fetchers[k].start(Search.searchers[k].url(p.t, n), p.t));
     }
 
     function resolveToken() {
