@@ -240,7 +240,7 @@ Item {
             onStreamFinished: {
                 projProc.acc = ({});
                 text.split("\n").forEach(l => root.parseProjLine(l));
-                root.data = projProc.acc;
+                root.byScope = projProc.acc;
             }
         }
     }
