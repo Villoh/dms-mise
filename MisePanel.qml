@@ -531,9 +531,7 @@ Item {
             model: pop.toolList
 
             delegate: MiseToolRow {
-                required property var modelData
                 width: ListView.view ? ListView.view.width : 0
-                row: modelData
                 open: pop.openRow === key
                 target: pop.target
                 draft: http
