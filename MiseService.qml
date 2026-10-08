@@ -249,8 +249,13 @@ Item {
         const e = acc[path] || (acc[path] = {
                 outdated: [],
                 bump: [],
-                tools: {}
+                tools: {},
+                warn: ""
             });
+        if (kind === "warn") {
+            e.warn = d;
+            return;
+        }
         // `mise` run in a project also reports the global tools: keep only what this config declares
         if (kind === "ls") {
             Object.keys(d).forEach(n => {
@@ -275,8 +280,9 @@ Item {
             e.bump = rows;
     }
 
-    // one line per call: `<kind>\t<config>\t<json on one line>`; args come in (config, dir) pairs
-    readonly property string projScript: 'while [ $# -gt 1 ]; do f=$1; d=$2; shift 2\n' + 'for k in ls outdated bump; do\n' + 'case $k in ls) a="ls --json";; outdated) a="outdated --json";; bump) a="outdated --bump --json";; esac\n' + 'printf "%s\\t%s\\t" "$k" "$f"; mise -C "$d" $a 2>/dev/null | tr -d "\\n"; printf "\\n"\n' + 'done; done'
+    // one line per call: `<kind>\t<config>\t<json on one line>`; args come in (config, dir) pairs. The last line of
+    // a project is `warn`: why mise printed nothing (untrusted config, tools missing from the lockfile) or "".
+    readonly property string projScript: 'while [ $# -gt 1 ]; do f=$1; d=$2; shift 2; e=$(mktemp)\n' + 'for k in ls outdated bump; do\n' + 'case $k in ls) a="ls --json";; outdated) a="outdated --json";; bump) a="outdated --bump --json";; esac\n' + 'printf "%s\\t%s\\t" "$k" "$f"; mise -C "$d" $a 2>>"$e" | tr -d "\\n"; printf "\\n"\n' + 'done\n' + 'w=; grep -q "not trusted" "$e" && w=untrusted || { grep -q "not in the lockfile" "$e" && w=unlocked; }\n' + 'printf "warn\\t%s\\t\\"%s\\"\\n" "$f" "$w"; rm -f "$e"\n' + 'done'
 
     // first line: $HOME; then every tracked config file that still exists
     readonly property string trackedScript: 'd="${MISE_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/mise}/tracked-configs"\n' + 'echo "$HOME"\n' + 'for f in "$d"/*; do [ -L "$f" ] || continue; p=$(readlink -f "$f") && [ -f "$p" ] && echo "$p"; done'
@@ -799,6 +805,20 @@ Item {
         jobProc.running = true;
     }
 
+    // why a scope shows nothing ("" = nothing to say); `*` = the first project that has a reason
+    readonly property var warnText: ({
+            untrusted: "not trusted, run `mise trust` there",
+            unlocked: "tools missing from its lockfile, run `mise lock` (`-g` for global)"
+        })
+    property bool globalUnlocked: false   // `mise outdated` skipped global tools missing from the lockfile
+    function warnOf(s) {
+        return s ? (projectData[s] || {}).warn : globalUnlocked ? "unlocked" : "";
+    }
+    function scopeWarning(scope) {
+        const s = (scope === "*" ? [""].concat(scopes) : [scope]).find(x => warnOf(x));
+        return s === undefined ? "" : scopeLabel(s) + ": " + warnText[warnOf(s)];
+    }
+
     // project scopes run in the project's directory, so mise reads and rewrites that config
     function inDir(scope, args) {
         return scope ? ["-C", projectDir(scope)].concat(args) : args;
@@ -1027,6 +1047,9 @@ Item {
     Process {
         id: checkProc
         command: ["mise", "outdated", "--json"]
+        stderr: StdioCollector {
+            onStreamFinished: root.globalUnlocked = /not in the lockfile/.test(text)
+        }
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
