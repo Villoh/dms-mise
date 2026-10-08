@@ -110,8 +110,8 @@ Item {
     }
     readonly property bool searching: tab === 1 && query.trim() !== ""
     // remote lookup only while the Tools tab is being searched
-    onQueryChanged: MiseService.lookup(tab === 1 ? query : "")
-    onTabChanged: MiseService.lookup(tab === 1 ? query : "")
+    onQueryChanged: MiseRemote.lookup(tab === 1 ? query : "")
+    onTabChanged: MiseRemote.lookup(tab === 1 ? query : "")
     // in-range updates first, then bump-only (pinned / newer major) rows
     readonly property var updRows: MiseService.outdated.map(t => ({
                 name: t.name,
@@ -593,7 +593,7 @@ Item {
         height: 2
         color: "transparent"
         clip: true
-        visible: pop.tab === 1 && MiseService.lookingUp
+        visible: pop.tab === 1 && MiseRemote.lookingUp
 
         Rectangle {
             id: seg
@@ -760,8 +760,8 @@ Item {
         anchors.topMargin: visible ? Theme.spacingS : 0
         width: parent.width
         height: visible ? implicitHeight : 0
-        visible: pop.tab === 1 && MiseService.notices.length > 0
-        text: MiseService.notices.join("\n")
+        visible: pop.tab === 1 && MiseRemote.notices.length > 0
+        text: MiseRemote.notices.join("\n")
         color: Theme.warning
         font.pixelSize: Theme.fontSizeSmall
         elide: Text.ElideRight
@@ -800,7 +800,7 @@ Item {
                 }
                 if (!pop.searching)
                     return "Nothing installed yet.\nType a name, or any backend:tool\ne.g. pipx:package, npm:package, cargo:crate, github:owner/repo\nOptions: pipx:package[uvx_args=--python 3.14]";
-                if (MiseService.lookingUp)
+                if (MiseRemote.lookingUp)
                     return "Searching…";
                 return MiseService.registry.length ? "No matches. Use backend:tool to install anything else." : "Loading registry…";
             }

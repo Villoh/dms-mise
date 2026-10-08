@@ -203,7 +203,7 @@ dms ipc call plugins reload mise
 The search, ranking and verification logic has no Quickshell dependency (`MiseSearch.js`) and is tested against recorded API answers in `tests/fixtures/`, with Node's standard library only:
 
 ```sh
-node --test tests/
+node --test
 ```
 
 CI runs the same command with the `nodejs` pinned in `.github/workflows/ci.yml`. To refresh a fixture, save the answer of the URL in `MiseSearch.js` (`searchers` / `verifiers`), trimmed to the fields the parser reads.

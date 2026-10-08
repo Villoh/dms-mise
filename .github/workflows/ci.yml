@@ -143,4 +143,4 @@ jobs:
       - name: node --test
         env:
           NIXPKGS: github:NixOS/nixpkgs/aa48d347080940b8a2b8d2f48228674e280a3514
-        run: nix shell "$NIXPKGS#nodejs" -c node --test tests/
+        run: nix shell "$NIXPKGS#nodejs" -c node --test

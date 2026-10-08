@@ -31,6 +31,11 @@ QtObject {
         function onCheckingChanged() {
             root.poke();
         }
+    }
+
+    // remote hits, exact-name checks and their notices land later too
+    property Connections remote: Connections {
+        target: MiseRemote
         function onRemoteChanged() {
             root.poke();
         }
@@ -66,7 +71,7 @@ QtObject {
     function getItems(query) {
         const raw = (query || "").trim();   // search() needs the original case: github:Owner/Repo, [opts]
         const q = raw.toLowerCase();
-        MiseService.lookup(raw);   // debounced npm / crates.io / GitHub lookup; results arrive via onRemoteChanged
+        MiseRemote.lookup(raw);   // debounced npm / crates.io / GitHub lookup; results arrive via onRemoteChanged
         const items = [];
         const out = MiseService.outdated.filter(t => t.name.toLowerCase().includes(q));
 
@@ -101,7 +106,7 @@ QtObject {
                 action: (r.installed ? "installed:" : "install:") + r.name,
                 categories: ["mise"]
             }));
-        if (q && MiseService.lookingUp)
+        if (q && MiseRemote.lookingUp)
             items.push({
                 name: "Searching…",
                 icon: "material:sync",
@@ -110,7 +115,7 @@ QtObject {
                 categories: ["mise"]
             });
         if (q)
-            MiseService.notices.forEach(n => items.push({
+            MiseRemote.notices.forEach(n => items.push({
                     name: n,
                     icon: "material:cloud_off",
                     comment: "results from it are missing",
