@@ -398,54 +398,26 @@ Item {
     }
 
     // ---- backend filter chips (updates, or tools when not searching) ----
-    Flickable {
+    MiseBackendChips {
         id: chips
         anchors.top: field.bottom
         anchors.topMargin: visible ? Theme.spacingS : 0
         width: parent.width
         visible: !pop.searching && (pop.backends.length > 1 || (pop.tab === 0 && MiseService.ignored.length > 0))
-        height: visible ? pop.chipH : 0
-        contentWidth: chipRow.width
-        clip: true
-        boundsBehavior: Flickable.StopAtBounds
-
-        Row {
-            id: chipRow
-            spacing: Theme.spacingXS
-            Repeater {
-                model: [
-                    {
-                        key: "",
-                        label: "All"
-                    }
-                ].concat(pop.backends, pop.tab === 0 && MiseService.ignored.length > 0 ? [
-                    {
-                        key: "__ignored",
-                        label: "ignored " + MiseService.ignored.length
-                    }
-                ] : [])
-                delegate: Rectangle {
-                    required property var modelData
-                    readonly property bool active: pop.backend === modelData.key
-                    height: pop.chipH
-                    width: chipLabel.implicitWidth + Theme.spacingM * 2
-                    radius: height / 2
-                    color: active ? Theme.primary : Theme.surfaceContainerHigh
-                    StyledText {
-                        id: chipLabel
-                        anchors.centerIn: parent
-                        text: modelData.label
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: parent.active ? Theme.primaryText : Theme.surfaceText
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: pop.backend = modelData.key
-                    }
-                }
+        chipH: pop.chipH
+        current: pop.backend
+        options: [
+            {
+                key: "",
+                label: "All"
             }
-        }
+        ].concat(pop.backends, pop.tab === 0 && MiseService.ignored.length > 0 ? [
+            {
+                key: "__ignored",
+                label: "ignored " + MiseService.ignored.length
+            }
+        ] : [])
+        onPicked: key => pop.backend = key
     }
 
     // a backend of this query did not answer (the loading bar is gone by then)
