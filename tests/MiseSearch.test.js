@@ -311,3 +311,29 @@ test("describe: trimmed to one line of 80 chars; odd shapes give \"\"", () => {
     assert.equal(S.describe({ crate: {} }), "");
     assert.equal(S.describe("Not Found"), "", "npm answers a bare string on 404");
 });
+
+test("parseSettings: flattens groups, joins arrays, sections with set ones first", () => {
+    const l = S.parseSettings({
+        paranoid: { value: false, type: "boolean", description: "extra safe" },
+        jobs: { value: 4, type: "number", description: "parallel", source: "/c.toml" },
+        disable_hints: { value: ["a", "b"], type: "array", description: "hints" },
+        npm: { package_manager: { value: "npm", type: "string", description: "which", source: "/c.toml" } }
+    });
+    assert.deepEqual(l.map(s => s.key), ["jobs", "npm.package_manager", "disable_hints", "paranoid"]);
+    assert.deepEqual(l[0], { key: "jobs", type: "number", value: "4", desc: "parallel", set: true, section: "Configured" });
+    assert.deepEqual(l.map(s => s.section), ["Configured", "Configured", "General", "General"]);
+    assert.equal(l[2].value, "a,b");
+    assert.equal(l[3].value, "false");
+    assert.equal(l[3].set, false);
+    assert.deepEqual(S.parseSettings({}), []);
+});
+
+test("filterSettings: name or description, any case", () => {
+    const l = S.parseSettings({
+        jobs: { value: 8, type: "number", description: "Parallel installs" },
+        paranoid: { value: false, type: "boolean", description: "extra safe" }
+    });
+    assert.deepEqual(S.filterSettings(l, " JOB ").map(s => s.key), ["jobs"]);
+    assert.deepEqual(S.filterSettings(l, "safe").map(s => s.key), ["paranoid"]);
+    assert.equal(S.filterSettings(l, "").length, 2);
+});

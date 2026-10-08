@@ -17,11 +17,12 @@ One file per concern, all flat in the plugin folder (Quickshell resolves them th
 | `MiseProjects.qml` | Followed projects: mode, lists, `scopes`, per-scope data, add / remove |
 | `MiseJobs.qml` | One mise job at a time: command queue, log, toasts, `finished` |
 | `MiseRemote.qml` | Search-as-you-type on package sites and the exact-name check, with the GitHub token |
+| `MiseConfig.qml` | `mise settings`: all settings, which are set in the global config, set / unset / toggle, run on their own (no job banner or toast, errors toast) |
 | `MiseInfo.qml` | Row details (`mise tool`, `ls-remote`) and the `http:` latest check |
 | `MiseSearch.js` | Pure search / ranking / parsers / verifier URLs, no Quickshell (tested) |
 | `MiseScripts.js` | The `sh` scripts the services run |
 | `MisePanel.qml` | The popout: derives the rows and the picked scope, lays out the pieces below |
-| `MisePanelToolbar`, `MiseJobBanner`, `MiseBackendChips`, `MiseUpdateRow`, `MiseToolRow`, `MiseToolDetails`, `MiseVersionChip`, `MiseHttpForm` + `MiseHttpDraft`, `MiseScopeMenu`, `MiseFixMenu` | Panel pieces, fed by properties; `MiseConfirm` is the shared arm-then-confirm click |
+| `MisePanelToolbar`, `MiseJobBanner`, `MiseBackendChips`, `MiseUpdateRow`, `MiseConfigRow`, `MiseToolRow`, `MiseToolDetails`, `MiseVersionChip`, `MiseHttpForm` + `MiseHttpDraft`, `MiseScopeMenu`, `MiseFixMenu` | Panel pieces, fed by properties; `MiseConfirm` is the shared arm-then-confirm click |
 | `MiseBar.qml`, `MiseLauncher.qml`, `MiseDaemon.qml`, `MiseSettings.qml` | Bar widget, launcher provider, daemon, settings page |
 
 ## Tests

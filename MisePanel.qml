@@ -58,8 +58,9 @@ Item {
         field.forceActiveFocus();
     }
 
-    property int tab: 0            // 0 = updates, 1 = tools (installed + install)
+    property int tab: 0            // 0 = updates, 1 = tools (installed + install), 2 = mise settings
     property string updFilter: ""
+    property string cfgFilter: ""
     property string query: ""
     property string backend: ""     // backend chip filter ("" = all)
     property string openRow: ""    // tools tab: the one expanded row (name|scope)
@@ -174,6 +175,20 @@ Item {
     }
     readonly property var baseNames: tab === 0 ? updRows.filter(inScope).map(t => t.name) : installedRows.map(t => t.name)
     readonly property var backends: {
+        // settings: the sections of what the filter leaves, in list order (Configured, General, then by name)
+        if (tab === 2) {
+            const n = {};
+            const keys = [];
+            MiseConfig.matching(cfgFilter).forEach(s => {
+                if (!(s.section in n))
+                    keys.push(s.section);
+                n[s.section] = (n[s.section] || 0) + 1;
+            });
+            return keys.map(k => ({
+                        key: k,
+                        label: k + " " + n[k]
+                    }));
+        }
         const c = {};
         baseNames.forEach(n => {
             const b = MiseService.backendOf(n);
@@ -213,7 +228,26 @@ Item {
                     sub: r.backend + (scope === "*" && MiseProjects.scopes.length ? " · installs globally" : "")
                 })));
     }
-    readonly property int shown: tab === 0 ? updList.length : toolList.length
+    // mise settings (global config): only read once the tab is opened
+    // the picked section chip; "" = all, also when the picked one is gone (reset the last Configured setting)
+    readonly property string cfgSection: tab === 2 && backends.some(b => b.key === backend) ? backend : ""
+    // with a header row ({header: true, title}) before each section: a ListView `section` header kept a stale
+    // title after the list was replaced
+    readonly property var cfgList: {
+        const out = [];
+        let last = "";
+        (tab === 2 ? MiseConfig.matching(cfgFilter) : []).filter(s => !cfgSection || s.section === cfgSection).forEach(s => {
+            if (!cfgSection && s.section !== last)
+                out.push({
+                    header: true,
+                    title: s.section
+                });
+            last = s.section;
+            out.push(s);
+        });
+        return out;
+    }
+    readonly property int shown: tab === 0 ? updList.length : tab === 1 ? toolList.length : cfgList.length
     // the `http:` form's text lives here, not in its row: the list is rebuilt now and then, and a row would lose it
     MiseHttpDraft {
         id: http
@@ -296,12 +330,14 @@ Item {
         height: pop.controlH
         leftIconName: "search"
         showClearButton: true
-        placeholderText: pop.tab === 0 ? "Filter updates…" : "Search installed & registry, or type backend:tool…"
+        placeholderText: pop.tab === 0 ? "Filter updates…" : pop.tab === 1 ? "Search installed & registry, or type backend:tool…" : "Filter mise settings…"
         onTextEdited: {
             if (pop.tab === 0)
                 pop.updFilter = text;
-            else
+            else if (pop.tab === 1)
                 pop.query = text;
+            else
+                pop.cfgFilter = text;
         }
         // Enter installs the top not-yet-installed hit
         onAccepted: {
@@ -410,19 +446,21 @@ Item {
         target: pop
         function onTabChanged() {
             pop.backend = "";
-            field.text = pop.tab === 0 ? pop.updFilter : pop.query;
+            field.text = pop.tab === 0 ? pop.updFilter : pop.tab === 1 ? pop.query : pop.cfgFilter;
+            if (pop.tab === 2)
+                MiseConfig.refresh();   // the config may have been edited by hand
         }
     }
 
-    // ---- backend filter chips (updates, or tools when not searching) ----
+    // ---- backend filter chips (updates, or tools when not searching); settings: section chips ----
     MiseBackendChips {
         id: chips
         anchors.top: field.bottom
         anchors.topMargin: visible ? Theme.spacingS : 0
         width: parent.width
-        visible: !pop.searching && (pop.backends.length > 1 || (pop.tab === 0 && MiseService.ignored.length > 0))
+        visible: pop.tab === 2 ? pop.backends.length > 1 : !pop.searching && (pop.backends.length > 1 || (pop.tab === 0 && MiseService.ignored.length > 0))
         chipH: pop.chipH
-        current: pop.backend
+        current: pop.tab === 2 ? pop.cfgSection : pop.backend
         options: [
             {
                 key: "",
@@ -482,6 +520,8 @@ Item {
                         return pop.scopeName + " is up to date · " + pop.elsewhereText;
                     return "Everything is up to date";
                 }
+                if (pop.tab === 2)
+                    return MiseConfig.all.length ? "No settings match" : "Loading settings…";
                 if (!pop.searching)
                     return "Nothing installed yet.\nType a name, or any backend:tool\ne.g. pipx:package, npm:package, cargo:crate, github:owner/repo\nOptions: pipx:package[uvx_args=--python 3.14]";
                 if (MiseRemote.lookingUp)
@@ -530,6 +570,44 @@ Item {
                 chipH: pop.chipH
                 onToggled: pop.openRow = open ? "" : key
                 onInstalled: pop.openRow = ""
+            }
+        }
+
+        // mise settings: switch or value per row
+        DankListView {
+            anchors.fill: parent
+            anchors.margins: Theme.spacingS
+            visible: pop.tab === 2 && pop.cfgList.length > 0
+            clip: true
+            spacing: Theme.spacingXS
+            model: pop.cfgList
+
+            delegate: Loader {
+                id: cfgItem
+                required property var modelData
+                width: ListView.view ? ListView.view.width : 0
+                sourceComponent: modelData.header ? cfgHeader : cfgRow
+
+                Component {
+                    id: cfgHeader
+                    StyledText {
+                        height: implicitHeight + Theme.spacingM
+                        verticalAlignment: Text.AlignBottom
+                        leftPadding: Theme.spacingM
+                        text: cfgItem.modelData.title
+                        font.pixelSize: Theme.fontSizeSmall
+                        font.weight: Font.Bold
+                        color: Theme.surfaceVariantText
+                    }
+                }
+                Component {
+                    id: cfgRow
+                    MiseConfigRow {
+                        row: cfgItem.modelData
+                        iconBtn: pop.iconBtn
+                        actionIcon: pop.actionIcon
+                    }
+                }
             }
         }
     }
