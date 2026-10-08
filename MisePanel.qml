@@ -541,6 +541,8 @@ Item {
         z: 10
         visible: pop.menuOpen || pop.fixOpen
         onClicked: pop.closeMenu()
+        onWheel: wheel => wheel.accepted = true
+        // don't scroll the list underneath
     }
 
     MiseFixMenu {
