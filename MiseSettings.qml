@@ -305,19 +305,11 @@ PluginSettings {
         width: parent.width
         spacing: Theme.spacingS
 
-        property var entries: PluginService.loadPluginState("mise", "ignored", []) || []
+        readonly property var entries: MiseService.ignored
 
         function label(k) {
             const m = k.match(/^(.*)@([^\/@:]+)$/);
             return m ? m[1] + "  ·  skipping " + m[2] : k + "  ·  all versions";
-        }
-
-        Connections {
-            target: PluginService
-            function onPluginStateChanged(pluginId) {
-                if (pluginId === "mise")
-                    ignoredSection.entries = PluginService.loadPluginState("mise", "ignored", []) || [];
-            }
         }
 
         Item {
@@ -340,7 +332,7 @@ PluginSettings {
                 text: "Clear all"
                 iconName: "delete_sweep"
                 buttonHeight: Theme.iconSize + Theme.spacingS
-                onClicked: PluginService.savePluginState("mise", "ignored", [])
+                onClicked: MiseService.clearIgnored()
             }
         }
 
@@ -392,7 +384,7 @@ PluginSettings {
                     iconName: "undo"
                     iconColor: Theme.primary
                     tooltipText: "Stop ignoring"
-                    onClicked: PluginService.savePluginState("mise", "ignored", ignoredSection.entries.filter(k => k !== modelData))
+                    onClicked: MiseService.unignore(modelData)
                 }
             }
         }

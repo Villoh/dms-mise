@@ -196,7 +196,22 @@ ln -s "$PWD" ~/.config/DankMaterialShell/plugins/mise
 dms ipc call plugins reload mise
 ```
 
-`reload` is enough for `MiseBar.qml` / `MiseLauncher.qml` / `MiseDaemon.qml` edits. `MiseService.qml` is a singleton and `MisePanel.qml` is registered, both through `qmldir`, `MiseSearch.js` is a `.pragma library` cached for the life of the engine, and `plugin.json` is read at scan time: for those, run `dms restart`.
+`reload` is enough for `MiseBar.qml` / `MiseLauncher.qml` / `MiseDaemon.qml` edits. The singletons and `MisePanel.qml` are registered through `qmldir`, the `.js` libraries are cached for the life of the engine, and `plugin.json` is read at scan time: for those, run `dms restart`.
+
+### Layout
+
+One file per concern, all flat in the plugin folder (Quickshell resolves them through `qmldir`):
+
+| File | Role |
+| --- | --- |
+| `MiseService.qml` | Global inventory (`mise ls` / `outdated` / `registry`), ignored updates, settings, the actions (`upgrade`, `bump`, `install`, `uninstall`, `prune`) and what mixes global and project state (`toolsIn`, `scopeWarning`) |
+| `MiseProjects.qml` | Followed projects: mode, lists, `scopes`, per-scope data, add / remove |
+| `MiseJobs.qml` | One mise job at a time: command queue, log, toasts, `finished` |
+| `MiseRemote.qml` | Search-as-you-type on package sites and the exact-name check, with the GitHub token |
+| `MiseInfo.qml` | Row details (`mise tool`, `ls-remote`) and the `http:` latest check |
+| `MiseSearch.js` | Pure search / ranking / parsers / verifier URLs, no Quickshell (tested) |
+| `MiseScripts.js` | The `sh` scripts the services run |
+| `MisePanel.qml`, `MiseBar.qml`, `MiseLauncher.qml`, `MiseDaemon.qml`, `MiseSettings.qml` | UI |
 
 ### Tests
 

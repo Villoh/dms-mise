@@ -125,6 +125,11 @@ Item {
         PluginService.savePluginState("mise", "ignored", ignored);
     }
 
+    function clearIgnored() {
+        ignored = [];
+        PluginService.savePluginState("mise", "ignored", ignored);
+    }
+
     // "npm:foo" -> "npm"; plain registry names -> "registry"
     function backendOf(name) {
         return Search.backendOf(name);
