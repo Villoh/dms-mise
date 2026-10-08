@@ -32,15 +32,22 @@ Rectangle {
     height: open ? row.rowH + (modelData.template ? tplForm.implicitHeight : details.implicitHeight) + Theme.spacingS : row.rowH
     clip: true
     radius: Theme.cornerRadius
+    Behavior on height {
+        NumberAnimation {
+            duration: Theme.shortDuration
+            easing.type: Easing.OutQuad
+        }
+    }
     color: open ? Theme.surfaceContainerHigh : rowHover.containsMouse ? Theme.primaryHoverLight : "transparent"
     MouseArea {
         id: rowHover
-        anchors.fill: parent
+        anchors.fill: head   // the header only: clicks in the expanded area must not collapse it
         hoverEnabled: true
-        cursorShape: modelData.template ? Qt.PointingHandCursor : Qt.ArrowCursor
+        cursorShape: Qt.PointingHandCursor
         onClicked: {
-            if (modelData.template)
-                row.toggled();
+            row.toggled();
+            if (row.open && !modelData.template)
+                MiseInfo.loadInfo(modelData.name, modelData.scope);
         }
     }
     MiseConfirm {
@@ -64,7 +71,7 @@ Rectangle {
     Column {
         anchors.left: rowIcon.right
         anchors.leftMargin: Theme.spacingM
-        anchors.right: infoBtn.left
+        anchors.right: chevron.left
         anchors.rightMargin: Theme.spacingS
         anchors.verticalCenter: head.verticalCenter
         spacing: 1
@@ -91,19 +98,20 @@ Rectangle {
             maximumLineCount: 1
         }
     }
-    DankActionButton {
-        id: infoBtn
-        visible: !modelData.template
+    // expand indicator: the whole header toggles, the chevron only shows the state
+    DankIcon {
+        id: chevron
         anchors.right: rowBtn.left
         anchors.verticalCenter: head.verticalCenter
-        buttonSize: row.iconBtn
-        iconName: row.open ? "expand_less" : "info"
-        iconColor: Theme.surfaceVariantText
-        tooltipText: "Details & versions"
-        onClicked: {
-            row.toggled();
-            if (row.open)
-                MiseInfo.loadInfo(modelData.name, modelData.scope);
+        name: "expand_more"
+        size: Theme.iconSize
+        color: Theme.surfaceVariantText
+        rotation: row.open ? 180 : 0
+        Behavior on rotation {
+            NumberAnimation {
+                duration: Theme.shortDuration
+                easing.type: Easing.OutQuad
+            }
         }
     }
     DankActionButton {
@@ -134,7 +142,13 @@ Rectangle {
     // `http:` row, expanded: the options of an http-backend tool
     MiseHttpForm {
         id: tplForm
-        visible: row.open && modelData.template
+        opacity: row.open && modelData.template ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity {
+            NumberAnimation {
+                duration: Theme.shortDuration
+            }
+        }
         anchors.top: head.bottom
         anchors.left: rowIcon.right
         anchors.right: parent.right
@@ -150,7 +164,13 @@ Rectangle {
     // expanded: description, backend, installed versions, and the latest versions to pin
     MiseToolDetails {
         id: details
-        visible: row.open && !modelData.template
+        opacity: row.open && !modelData.template ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity {
+            NumberAnimation {
+                duration: Theme.shortDuration
+            }
+        }
         anchors.top: head.bottom
         anchors.left: rowIcon.right
         anchors.right: parent.right
