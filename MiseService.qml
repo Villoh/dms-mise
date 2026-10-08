@@ -16,6 +16,7 @@ Item {
     property var prunable: ({})  // name -> [versions] no tracked config uses (`mise ls --prunable`)
     readonly property int prunableCount: Object.keys(prunable).reduce((n, k) => n + prunable[k].length, 0)
     property var registry: []    // [{name, backend}] ~1000 curated entries
+    property bool installUnlocked: false  // let Install run with `locked` off, so it can add the tool to the lockfile (Settings)
     property bool remoteSearch: true  // query npm / crates.io / GitHub as you type (Settings)
     property string lookupQ: ""       // last query handed to lookup()
     property var remoteHits: ({})     // backend -> [{name: "npm:foo", backend, desc}], from the last answer
@@ -108,6 +109,7 @@ Item {
         showBumps = !(b === false || b === "false");
         const r = PluginService.loadPluginData("mise", "remoteSearch", true);
         remoteSearch = !(r === false || r === "false");
+        installUnlocked = PluginService.loadPluginData("mise", "installUnlocked", false) === true;
     }
 
     Connections {
@@ -790,7 +792,7 @@ Item {
         }
         jobProc.doneMsg = doneMsg;
         jobProc.queue = cmds.slice(1);
-        jobProc.command = ["mise"].concat(cmds[0]);
+        jobProc.prepare(cmds[0]);
         jobLabel = label;
         jobLog = [];
         busy = true;
@@ -1005,7 +1007,7 @@ Item {
 
     // the useful lines of a failed job (the tail is mostly mise's own "Version:/Location:" footer)
     function failureSummary() {
-        const hit = jobLog.filter(l => /×|│|ERROR|failed|mismatch|not found|denied|404|403/i.test(l) && !/Version:|--verbose|BACKTRACE/i.test(l));
+        const hit = jobLog.filter(l => /×|│|ERROR|hint:|failed|mismatch|not found|denied|404|403/i.test(l) && !/Version:|--verbose|BACKTRACE/i.test(l));
         return (hit.length ? hit : jobLog).slice(-4).join("\n");
     }
 
@@ -1171,10 +1173,17 @@ Item {
         id: jobProc
         property string doneMsg: ""
         property var queue: []   // commands still to run after this one
-        // verbose so a failure carries the backend's own reason (aube/npm/uv...), not just "exit code 1"
-        environment: ({
+        // verbose so a failure carries the backend's own reason (aube/npm/uv...), not just "exit code 1".
+        // With `locked = true` mise refuses `use` for a tool the lockfile does not know (No lockfile URL found).
+        // Only when the user allows it in Settings, `use` runs unlocked and mise writes the lockfile entries.
+        function prepare(args) {
+            environment = Object.assign({
                 MISE_VERBOSE: "1"
-            })
+            }, args[0] === "use" && root.installUnlocked ? {
+                MISE_LOCKED: "0"
+            } : {});
+            command = ["mise"].concat(args);
+        }
         stdout: SplitParser {
             onRead: l => root.pushLog(l)
         }
@@ -1183,7 +1192,7 @@ Item {
         }
         onExited: code => {
             if (code === 0 && queue.length) {
-                command = ["mise"].concat(queue[0]);
+                prepare(queue[0]);
                 queue = queue.slice(1);
                 Qt.callLater(() => jobProc.running = true);
                 return;

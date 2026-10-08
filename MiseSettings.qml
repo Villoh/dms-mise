@@ -110,6 +110,13 @@ PluginSettings {
         defaultValue: true
     }
 
+    ToggleSetting {
+        settingKey: "installUnlocked"
+        label: "Install with `locked` off"
+        description: "With `locked = true` in your mise settings, Install fails for a tool the lockfile does not have yet (run `mise lock` yourself). On: Install runs with `locked` off, so mise adds the tool to the lockfile. Update and Bump always follow your settings."
+        defaultValue: false
+    }
+
     SelectionSetting {
         settingKey: "projectsMode"
         label: "Project tools"
