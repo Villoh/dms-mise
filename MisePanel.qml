@@ -46,7 +46,7 @@ Item {
         onTriggered: pop.checkingShown = false
     }
 
-    readonly property string summary: MiseService.error || ((count > 0 ? count + " outdated" : (MiseService.scopes.length ? scopeName + " is up to date" : "All up to date")) + (bumpCount ? " · " + bumpCount + " bumpable" : "") + " · " + installedRows.length + " installed" + checkedText)
+    readonly property string summary: MiseService.error || MiseService.scopeWarning(scope) || ((count > 0 ? count + " outdated" : (MiseService.scopes.length ? scopeName + " is up to date" : "All up to date")) + (bumpCount ? " · " + bumpCount + " bumpable" : "") + " · " + installedRows.filter(r => r.installed).length + " installed" + checkedText)
 
     // on open. "updates" / "tools" are fixed; anything else is auto:
     // Updates if something is pending (updates or bumps), Tools otherwise
@@ -155,6 +155,15 @@ Item {
                     installed: true,
                     direct: false,
                     sub: (v[n] || "") + (showScope ? (v[n] ? " · " : "") + MiseService.scopeLabel(s) : "")
+                }));
+            // declared but not installed: listed apart, with the install button
+            MiseService.missingIn(s).forEach(n => out.push({
+                    name: n,
+                    scope: s,
+                    installed: false,
+                    missing: true,
+                    direct: false,
+                    sub: (v[n] || "") + " · not installed" + (showScope ? " · " + MiseService.scopeLabel(s) : "")
                 }));
         });
         return out.sort((a, b) => a.name.localeCompare(b.name) || a.scope.localeCompare(b.scope));
@@ -317,7 +326,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             height: pop.iconBtn
             // the label is what shrinks (elided) when the project name is long
-            readonly property real maxLabelW: pop.width - toolbarTabs.width - refreshBtn.width - Theme.spacingM * 4 - (Theme.iconSize - 6) * 2 - Theme.spacingXS * 2
+            readonly property real maxLabelW: pop.width - toolbarTabs.width - refreshBtn.width - (fixBtn.visible ? fixBtn.width + Theme.spacingXS : 0) - Theme.spacingM * 4 - (Theme.iconSize - 6) * 2 - Theme.spacingXS * 2
             width: scopeBtnRow.implicitWidth + Theme.spacingM * 2
             radius: Theme.cornerRadius
             color: pop.menuOpen || scopeHover.containsMouse ? Theme.primaryHoverLight : Theme.surfaceContainerHigh
@@ -370,6 +379,41 @@ Item {
                     size: Theme.iconSize - 6
                     color: Theme.surfaceVariantText
                 }
+            }
+        }
+
+        // what the warning of the picked scope asks for: `mise trust` (paranoid) or `mise lock`. First click arms, second runs.
+        DankActionButton {
+            id: fixBtn
+            property bool armed: false
+            readonly property var target: MiseService.warnedScope(pop.scope)   // undefined = nothing to fix
+            readonly property string kind: target === undefined ? "" : MiseService.warnOf(target)
+            readonly property string label: target === undefined ? "" : MiseService.scopeLabel(target)
+            visible: kind !== ""
+            anchors.right: scopeBtn.visible ? scopeBtn.left : refreshBtn.left
+            anchors.rightMargin: Theme.spacingXS
+            anchors.verticalCenter: parent.verticalCenter
+            buttonSize: pop.iconBtn
+            iconName: armed ? "check" : (kind === "untrusted" ? "gpp_maybe" : "lock")
+            iconColor: armed ? Theme.surface : Theme.warning
+            backgroundColor: armed ? Theme.warning : "transparent"
+            tooltipText: kind === "untrusted" ? (armed ? "Click again to run `mise trust` on " + label : "Not trusted: trust " + label + " (only if you wrote or reviewed its mise config)") : (armed ? "Click again to run `mise lock` on " + label : "Tools missing from the lockfile of " + label + ": run `mise lock`")
+            enabled: !MiseService.busy
+            onTargetChanged: armed = false
+            onKindChanged: armed = false
+            onClicked: {
+                if (!armed) {
+                    armed = true;
+                    fixReset.restart();
+                } else {
+                    armed = false;
+                    MiseService.fix(target);
+                }
+            }
+            Timer {
+                id: fixReset
+                interval: 3000
+                onTriggered: fixBtn.armed = false
             }
         }
 
@@ -533,7 +577,7 @@ Item {
         onAccepted: {
             if (pop.tab !== 1 || MiseService.busy)
                 return;
-            const r = pop.toolList.find(x => !x.installed && !x.template);
+            const r = pop.toolList.find(x => !x.installed && !x.missing && !x.template);
             if (r)
                 MiseService.install(r.name, pop.target);
         }
@@ -810,7 +854,7 @@ Item {
                     }
                     StyledText {
                         width: parent.width
-                        text: modelData.ignoredKey ? (modelData.latest ? "skipping " + modelData.latest : "ignored · all versions") : modelData.current + " → " + modelData.latest + (modelData.bump ? " · bump (requested " + modelData.requested + ")" : "") + (pop.showScope ? " · " + MiseService.scopeLabel(modelData.scope) : "")
+                        text: modelData.ignoredKey ? (modelData.latest ? "skipping " + modelData.latest : "ignored · all versions") : (modelData.current ? modelData.current + " → " : "not installed → ") + modelData.latest + (modelData.bump ? " · bump (requested " + modelData.requested + ")" : "") + (pop.showScope ? " · " + MiseService.scopeLabel(modelData.scope) : "")
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.surfaceVariantText
                         elide: Text.ElideRight
@@ -856,7 +900,7 @@ Item {
                         iconSize: pop.actionIcon
                         iconName: modelData.bump ? "upgrade" : "download"
                         iconColor: modelData.bump ? Theme.warning : Theme.primary
-                        tooltipText: modelData.bump ? "Bump: rewrites \"" + modelData.requested + "\" in your " + (modelData.scope ? "project's" : "global") + " mise config" : "Update"
+                        tooltipText: modelData.bump ? "Bump: rewrites \"" + modelData.requested + "\" in your " + (modelData.scope ? "project's" : "global") + " mise config" : (modelData.current ? "Update" : "Install")
                         enabled: !MiseService.busy
                         onClicked: modelData.bump ? MiseService.bump(modelData.name, modelData.scope) : MiseService.upgrade(modelData.name, modelData.scope)
                     }
@@ -980,10 +1024,12 @@ Item {
                     iconName: modelData.installed ? (row.confirm ? "check" : "delete") : "download"
                     iconColor: modelData.installed ? (row.confirm ? Theme.surface : Theme.error) : Theme.primary
                     backgroundColor: row.confirm ? Theme.error : "transparent"
-                    tooltipText: modelData.installed ? (row.confirm ? "Click again to remove" : "Remove" + MiseService.inLabel(modelData.scope)) : "Install latest" + (pop.target ? MiseService.inLabel(pop.target) : "")
+                    tooltipText: modelData.installed ? (row.confirm ? "Click again to remove" : "Remove" + MiseService.inLabel(modelData.scope)) : (modelData.missing ? "Install the declared version" + MiseService.inLabel(modelData.scope) : "Install latest" + (pop.target ? MiseService.inLabel(pop.target) : ""))
                     enabled: !MiseService.busy
                     onClicked: {
-                        if (!modelData.installed) {
+                        if (modelData.missing) {
+                            MiseService.upgrade(modelData.name, modelData.scope);
+                        } else if (!modelData.installed) {
                             MiseService.install(modelData.name, pop.target);
                         } else if (!row.confirm) {
                             row.confirm = true;

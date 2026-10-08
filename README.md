@@ -14,8 +14,8 @@ Pill with a chef hat icon. Two counters appear next to it: updates (primary colo
 
 Click it for the popout:
 
-- **Updates**: outdated tools (`current → latest`), filter box, backend chips, per-tool download button, and **Update all** at the bottom. If some tools are pinned or have a newer major, **Bump all** appears next to it (click twice to confirm).
-- **Tools**: your installed tools (version, remove). Type to search installed tools and the mise registry; the download icon installs. Enter installs the first result not yet installed.
+- **Updates**: outdated tools (`current → latest`; `not installed → version` for a tool your config declares but that is not installed yet, whose button installs it), filter box, backend chips, per-tool download button, and **Update all** at the bottom. If some tools are pinned or have a newer major, **Bump all** appears next to it (click twice to confirm).
+- **Tools**: your installed tools (version, remove). A tool your config declares but that is not installed shows `not installed` with a download button (installs the declared version) and does not count as installed. Type to search installed tools and the mise registry; the download icon installs. Enter installs the first result not yet installed.
 - Refresh button checks on demand: the icon spins on hover and the button turns into a spinner while checking (held briefly so quick checks stay visible). A banner shows what mise is doing and its last output line; failures show the last lines of output in a toast.
 
 Each update row can be **skipped** (`skip_next`: that target version only, it shows again when a newer one appears) or **ignored** (`visibility_off`: the tool, whatever the version). Ignored items are not counted in the badge and are left out of *Update all*, *Bump all* and the launcher. The `ignored N` chip lists them with an undo button. Also listed, with undo and *Clear all*, in Settings → Plugins → mise. Stored in the plugin state (`~/.local/state/DankMaterialShell/plugins/mise_state.json`), not in your mise config. Handy for a release that fails to install (e.g. a badly published npm package that `aube` rejects).
@@ -155,19 +155,34 @@ Settings → Plugins → mise: check interval (15 min, 30 min, 1 h, 4 h, daily).
 | GitHub token | `mise token github --raw` (once per session, on the first GitHub request) |
 | Update | `mise upgrade --yes [tool]` (`mise -C <project> upgrade ...` for a project) |
 | Bump | `mise upgrade --bump --yes <tool>` (same `-C`) |
-| Install | `mise use --global --yes <tool>`, or `mise use --path <config> --yes <tool>` for a project |
+| Install | `mise use --global --yes <tool>`, or `mise use --path <config> --yes <tool>` for a project (under `locked = true` see *Your mise settings*) |
 | Details | `mise tool --json <tool>`, `mise ls-remote <tool>` (30 s timeout, only when a row is expanded) |
 | Remove a version | `mise uninstall --yes <tool>@<version>` |
 | Prune | `mise ls --prunable --json` (with every check), `mise prune --tools --yes [tool]` |
 | Remove | `mise unuse --global --yes <tool>`, or `mise unuse --path <config> --yes <tool>` for a project |
+| Trust | `mise trust <config>` (only from the shield button, after two clicks) |
+| Lock | `mise lock -g`, or `mise -C <project> lock` (only from the lock button, after two clicks) |
 
 One job at a time.
+
+## Your mise settings
+
+The plugin only runs `mise` and never edits its settings; it works with these:
+
+| Setting | What happens |
+| --- | --- |
+| `locked = true` | Respected. `mise use` refuses a tool the lockfile has no entry for, so for a plain tool (`name` or `name@version`; a version already in the config is rewritten, as `mise use` does) *Install* does what you would by hand: `mise config set` writes it to the config, `mise lock` locks it, `mise install` installs it. Tools with `[options]`, a `.` in the name, or declared in that config with options (a table or a list) fail with mise's error and a hint: add them to the config yourself, run `mise lock` and `mise install`, or turn on *Install with `locked` off* in Settings (then only Install runs with `MISE_LOCKED=0` and mise writes the lockfile entries). `lockfile = true` alone does not create a lockfile: run `mise lock` once in a project. Update and Bump always run with your settings. |
+| `paranoid = true` / untrusted configs | A project config has to be trusted by hand (`mise trust`), and again each time its content changes outside mise. Until then the project shows nothing and the popout says `not trusted, run mise trust there` and a shield button appears next to the scope picker: click it, then click again to run `mise trust` on that project (only do it for configs you wrote or reviewed). The plugin itself never runs `mise trust` unless you click that button, but Install runs `mise use`, and mise trusts the config `use` writes to (even when it fails): that is mise's behavior, not a setting of the plugin. The one other place it runs `mise trust` is the locked-install flow above, after its own edit of a project config, and only if that config loaded right before and no longer does (that is, under `paranoid`). |
+| Tools missing from the lockfile | `mise outdated` skips them, so the list would say *up to date*. The popout says `tools missing from its lockfile, run mise lock` instead, with a lock button next to the scope picker (click, then click again) that runs `mise lock` for that project, or `mise lock -g` for the global config. It resolves versions and writes `mise.lock`, not your config. Happens after editing a `mise.toml` by hand or pulling a change to it. |
+| `minimum_release_age` | Applied by mise itself; the plugin passes no flag that overrides it. |
+| `disable_backends`, `enable_tools` | The registry list follows them. Live search and a typed `backend:tool` do not: installing a disabled one fails with mise's own message. |
+| `auto_install_disable_tools`, `sandbox.*`, `trusted_config_paths` | Not used: the plugin never runs `mise x`, `run` or tasks. |
 
 ## Limits
 
 - Without a project selected, `install` and `remove` write the **global** mise config (`~/.config/mise/config.toml`). If that file is managed (chezmoi, home-manager) it ends up dirty or read-only. Project installs write that project's `mise.toml`, so they show up in git.
 - `remove` only works on the config you pick: a tool declared only in a project fails on *Global* (and the other way round) with mise's error.
-- Project configs that mise does not trust may fail to load; that project then shows nothing.
+- Project configs that mise does not trust fail to load; that project shows nothing and the popout says so (see *Your mise settings*).
 - `mise upgrade` respects the requested version (`node = "22"` never goes to 24, an exact pin never moves). Those show as **bump** rows (warning icon, from `mise outdated --bump`) with their own button, which runs `mise upgrade --bump <tool>` and rewrites the version in the config that declares the tool. Bumps are not counted in the badge and are never part of *Update all*. Turn them off in Settings.
 - It does not update the mise binary itself. If mise comes from nix/a package manager, update it there.
 - Old inactive versions are not pruned. Skipped versions that were superseded stay in the ignored list until you undo them.

@@ -11,11 +11,13 @@ Item {
     property var outdatedRaw: []  // [{name, requested, current, latest}] as mise reports them
     property var ignored: []      // "name" (all versions) or "name@version" (skip that target version)
     readonly property var outdated: outdatedRaw.concat(projectOutdated).filter(t => !isIgnored(t.name, t.latest))
-    property var installed: []   // ["node", "pipx:harlequin", ...]
+    property var installed: []   // really installed: ["node", "pipx:harlequin", ...]
+    property var missing: []     // declared in the global config but not installed (mise lists them too)
     property var versions: ({})  // name -> active version
     property var prunable: ({})  // name -> [versions] no tracked config uses (`mise ls --prunable`)
     readonly property int prunableCount: Object.keys(prunable).reduce((n, k) => n + prunable[k].length, 0)
     property var registry: []    // [{name, backend}] ~1000 curated entries
+    property bool installUnlocked: false  // let Install run with `locked` off, so it can add the tool to the lockfile (Settings)
     property bool remoteSearch: true  // query npm / crates.io / GitHub as you type (Settings)
     property string lookupQ: ""       // last query handed to lookup()
     property var remoteHits: ({})     // backend -> [{name: "npm:foo", backend, desc}], from the last answer
@@ -108,6 +110,7 @@ Item {
         showBumps = !(b === false || b === "false");
         const r = PluginService.loadPluginData("mise", "remoteSearch", true);
         remoteSearch = !(r === false || r === "false");
+        installUnlocked = PluginService.loadPluginData("mise", "installUnlocked", false) === true;
     }
 
     Connections {
@@ -158,7 +161,12 @@ Item {
     }
 
     function installedIn(scope) {
-        return scope ? Object.keys(toolsIn(scope)).sort() : installed;
+        return scope ? Object.keys(toolsIn(scope)).filter(n => !missingIn(scope).includes(n)).sort() : installed;
+    }
+
+    // declared in that config, not installed yet: `mise upgrade <tool>` installs the declared version
+    function missingIn(scope) {
+        return scope ? Object.keys((projectData[scope] || {}).missing || {}).sort() : missing;
     }
 
     // Two saves, and each one fires onPluginStateChanged synchronously: reloading in between would
@@ -247,15 +255,24 @@ Item {
         const e = acc[path] || (acc[path] = {
                 outdated: [],
                 bump: [],
-                tools: {}
+                tools: {},
+                missing: {},
+                warn: ""
             });
+        if (kind === "warn") {
+            e.warn = d;
+            return;
+        }
         // `mise` run in a project also reports the global tools: keep only what this config declares
         if (kind === "ls") {
             Object.keys(d).forEach(n => {
                 const own = (d[n] || []).filter(x => x.source && x.source.path === path);
                 const x = own.find(y => y.active) || own[0];
-                if (x)
-                    e.tools[n] = x.version || x.requested_version || "";
+                if (!x)
+                    return;
+                e.tools[n] = x.version || x.requested_version || "";
+                if (!own.some(y => y.installed))
+                    e.missing[n] = true;
             });
             return;
         }
@@ -273,8 +290,9 @@ Item {
             e.bump = rows;
     }
 
-    // one line per call: `<kind>\t<config>\t<json on one line>`; args come in (config, dir) pairs
-    readonly property string projScript: 'while [ $# -gt 1 ]; do f=$1; d=$2; shift 2\n' + 'for k in ls outdated bump; do\n' + 'case $k in ls) a="ls --json";; outdated) a="outdated --json";; bump) a="outdated --bump --json";; esac\n' + 'printf "%s\\t%s\\t" "$k" "$f"; mise -C "$d" $a 2>/dev/null | tr -d "\\n"; printf "\\n"\n' + 'done; done'
+    // one line per call: `<kind>\t<config>\t<json on one line>`; args come in (config, dir) pairs. The last line of
+    // a project is `warn`: why mise printed nothing (untrusted config, tools missing from the lockfile) or "".
+    readonly property string projScript: 'while [ $# -gt 1 ]; do f=$1; d=$2; shift 2; e=$(mktemp)\n' + 'for k in ls outdated bump; do\n' + 'case $k in ls) a="ls --json";; outdated) a="outdated --json";; bump) a="outdated --bump --json";; esac\n' + 'printf "%s\\t%s\\t" "$k" "$f"; mise -C "$d" $a 2>>"$e" | tr -d "\\n"; printf "\\n"\n' + 'done\n' + 'w=; grep -q "not trusted" "$e" && w=untrusted || { grep -q "not in the lockfile" "$e" && w=unlocked; }\n' + 'printf "warn\\t%s\\t\\"%s\\"\\n" "$f" "$w"; rm -f "$e"\n' + 'done'
 
     // first line: $HOME; then every tracked config file that still exists
     readonly property string trackedScript: 'd="${MISE_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/mise}/tracked-configs"\n' + 'echo "$HOME"\n' + 'for f in "$d"/*; do [ -L "$f" ] || continue; p=$(readlink -f "$f") && [ -f "$p" ] && echo "$p"; done'
@@ -298,7 +316,7 @@ Item {
         if (!q)
             return [];
         const out = [];
-        const isInstalled = n => sc ? n in toolsHere : installed.includes(n);
+        const isInstalled = n => sc ? n in toolsHere : installed.includes(n) || missing.includes(n);
         // name without `[opts]` / `@version`  (npm:@scope/pkg keeps its @)
         const bare = raw.replace(/\[.*\]$/, "").replace(/@[^/@:]*$/, "");
         const base = bare.toLowerCase();
@@ -778,23 +796,52 @@ Item {
         refreshProjects();
     }
 
-    function run(args, label, doneMsg) {
-        runMany([args], label, doneMsg);
+    function run(args, label, doneMsg, fallback) {
+        runMany([args], label, doneMsg, fallback);
     }
 
     // commands run one after another; the first failure stops the rest
-    function runMany(cmds, label, doneMsg) {
+    // `fallback`: a command to try, once, if the first one is refused for a missing lockfile entry
+    function runMany(cmds, label, doneMsg, fallback) {
         if (busy) {
             ToastService.showError("mise", "Another job is running");
             return;
         }
         jobProc.doneMsg = doneMsg;
         jobProc.queue = cmds.slice(1);
-        jobProc.command = ["mise"].concat(cmds[0]);
+        jobProc.fallback = fallback || [];
+        jobProc.prepare(cmds[0]);
         jobLabel = label;
         jobLog = [];
         busy = true;
         jobProc.running = true;
+    }
+
+    // why a scope shows nothing ("" = nothing to say); `*` = the first project that has a reason
+    readonly property var warnText: ({
+            untrusted: "not trusted, run `mise trust` there",
+            unlocked: "tools missing from its lockfile, run `mise lock` (`-g` for global)"
+        })
+    property bool globalUnlocked: false   // `mise outdated` skipped global tools missing from the lockfile
+    function warnOf(s) {
+        return s ? (projectData[s] || {}).warn : globalUnlocked ? "unlocked" : "";
+    }
+    // the first scope of `scope` ("*" = global, then every project) with something to say; undefined = none
+    function warnedScope(scope) {
+        return (scope === "*" ? [""].concat(scopes) : [scope]).find(x => warnOf(x));
+    }
+    function scopeWarning(scope) {
+        const s = warnedScope(scope);
+        return s === undefined ? "" : scopeLabel(s) + ": " + warnText[warnOf(s)];
+    }
+
+    // what the warning of a scope asks for, as a button would run it: `mise trust` on the project's config, or
+    // `mise lock` for its tools (`-g` for the global config). Only ever called from a button that asks twice.
+    function fix(scope) {
+        if (warnOf(scope) === "untrusted")
+            run(["trust", scope], "Trusting " + scopeLabel(scope), "Trusted " + scopeLabel(scope));
+        else
+            run(scope ? ["-C", projectDir(scope), "lock"] : ["lock", "-g"], "Locking " + scopeLabel(scope), "Locked " + scopeLabel(scope));
     }
 
     // project scopes run in the project's directory, so mise reads and rewrites that config
@@ -842,7 +889,24 @@ Item {
 
     // scope "" / omitted = global config, otherwise the project's config file path
     function install(tool, scope) {
-        run(scope ? ["use", "--path", scope, "--yes", tool] : ["use", "--global", "--yes", tool], "Installing " + tool + inLabel(scope), "Installed " + tool + inLabel(scope));
+        run(scope ? ["use", "--path", scope, "--yes", tool] : ["use", "--global", "--yes", tool], "Installing " + tool + inLabel(scope), "Installed " + tool + inLabel(scope), lockedInstall(tool, scope));
+    }
+
+    // With `locked = true` mise refuses `use` for a tool the lockfile lacks. What the user would do by hand: write the
+    // tool into the config, lock it, install it. `config set` only writes a plain `name = "version"`, so tools with
+    // [options], a dotted name (it would split the key) are left out and fail with failureSummary's hint. One the config declares with options (a
+    // table or a list) is refused by the script itself, reading the toml: `config set` would overwrite them, while
+    // a plain version is rewritten, as `mise use` does. `config set` makes a paranoid config untrusted
+    // (its hash changed): if the file loaded before our edit and no longer does, it is trusted again, like mise does
+    // for its own rewrites. One that did not load before stays as it is.
+    readonly property string lockedScript: 'f=$1; [ -n "$f" ] || f=${MISE_GLOBAL_CONFIG_FILE:-$HOME/.config/mise/config.toml}\n' + 'v=$(mise config get -f "$f" "tools.$3" 2>/dev/null) && case "$v" in *=*|"["*) echo "ERROR: $3 has options in $f: change it there by hand" >&2; exit 1;; esac\n' + 'if [ -n "$1" ]; then\n' + 'mise -C "$2" ls --json >/dev/null 2>&1 && t=1\n' + 'mise config set -f "$1" "tools.$3" "$4" && { mise -C "$2" ls --json >/dev/null 2>&1 || [ -z "$t" ] || mise trust "$1"; } && mise -C "$2" lock "$3" && mise -C "$2" install --yes "$3"\n' + 'else\n' + 'mise config set -f "$f" "tools.$3" "$4" && mise lock -g "$3" && mise install --yes "$3"\n' + 'fi'
+
+    function lockedInstall(tool, scope) {
+        const n = bareName(tool);
+        const v = tool.substring(n.length + 1) || "latest";
+        if (!/^[\w:@\/-]+$/.test(n) || !/^[\w.-]+$/.test(v) || (tool !== n && tool[n.length] !== "@"))
+            return [];
+        return ["sh", "-c", lockedScript, "sh", scope || "", scope ? projectDir(scope) : "", n, v];
     }
 
     // removes from that config and prunes the installed version
@@ -1005,7 +1069,9 @@ Item {
 
     // the useful lines of a failed job (the tail is mostly mise's own "Version:/Location:" footer)
     function failureSummary() {
-        const hit = jobLog.filter(l => /×|│|ERROR|failed|mismatch|not found|denied|404|403/i.test(l) && !/Version:|--verbose|BACKTRACE/i.test(l));
+        if (jobLog.some(l => /No lockfile URL|not in the lockfile/.test(l)))
+            return "`locked = true`: mise installs nothing the lockfile lacks. Add the tool to your mise config, run `mise lock`, then `mise install` (or turn on Install with `locked` off in Settings).";
+        const hit = jobLog.filter(l => /×|│|ERROR|hint:|failed|mismatch|not found|denied|404|403/i.test(l) && !/Version:|--verbose|BACKTRACE/i.test(l));
         return (hit.length ? hit : jobLog).slice(-4).join("\n");
     }
 
@@ -1025,6 +1091,9 @@ Item {
     Process {
         id: checkProc
         command: ["mise", "outdated", "--json"]
+        stderr: StdioCollector {
+            onStreamFinished: root.globalUnlocked = /not in the lockfile/.test(text)
+        }
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
@@ -1073,9 +1142,12 @@ Item {
             onStreamFinished: {
                 try {
                     const d = JSON.parse(text);
-                    root.installed = Object.keys(d);
+                    const keys = Object.keys(d);
+                    const has = k => d[k].some(x => x.installed);
+                    root.installed = keys.filter(has);
+                    root.missing = keys.filter(k => !has(k));
                     const v = {};
-                    root.installed.forEach(k => v[k] = (d[k].find(x => x.active) || d[k][0] || {}).version || "");
+                    keys.forEach(k => v[k] = (d[k].find(x => x.active) || d[k][0] || {}).version || "");
                     root.versions = v;
                 } catch (e) {}
             }
@@ -1171,10 +1243,18 @@ Item {
         id: jobProc
         property string doneMsg: ""
         property var queue: []   // commands still to run after this one
-        // verbose so a failure carries the backend's own reason (aube/npm/uv...), not just "exit code 1"
-        environment: ({
+        property var fallback: []   // see runMany
+        // verbose so a failure carries the backend's own reason (aube/npm/uv...), not just "exit code 1".
+        // With `locked = true` mise refuses `use` for a tool the lockfile does not know (No lockfile URL found).
+        // Only when the user allows it in Settings, `use` runs unlocked and mise writes the lockfile entries.
+        function prepare(args) {
+            environment = Object.assign({
                 MISE_VERBOSE: "1"
-            })
+            }, args[0] === "use" && root.installUnlocked ? {
+                MISE_LOCKED: "0"
+            } : {});
+            command = args[0] === "sh" ? args : ["mise"].concat(args);
+        }
         stdout: SplitParser {
             onRead: l => root.pushLog(l)
         }
@@ -1182,8 +1262,16 @@ Item {
             onRead: l => root.pushLog(l)
         }
         onExited: code => {
+            if (code !== 0 && fallback.length && !root.installUnlocked && root.jobLog.some(l => /No lockfile URL|not in the lockfile/.test(l))) {
+                const f = fallback;
+                fallback = [];
+                root.jobLog = [];
+                prepare(f);
+                Qt.callLater(() => jobProc.running = true);
+                return;
+            }
             if (code === 0 && queue.length) {
-                command = ["mise"].concat(queue[0]);
+                prepare(queue[0]);
                 queue = queue.slice(1);
                 Qt.callLater(() => jobProc.running = true);
                 return;
