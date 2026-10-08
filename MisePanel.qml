@@ -923,7 +923,7 @@ Item {
                 property bool confirm: false   // remove is two-step
                 readonly property string key: modelData.name + "|" + modelData.scope
                 readonly property bool open: pop.openRow === key
-                readonly property var info: MiseService.info[MiseService.bareName(modelData.name)] || ({})
+                readonly property var info: MiseService.info[MiseService.infoKey(modelData.name, modelData.scope)] || ({})
                 readonly property var unused: MiseService.prunable[MiseService.bareName(modelData.name)] || []
                 // `latest` first, then the latest versions, plus installed ones too old to be among them (so they can be removed)
                 readonly property var chipVersions: {
@@ -1009,7 +1009,7 @@ Item {
                     onClicked: {
                         pop.openRow = row.open ? "" : row.key;
                         if (row.open)
-                            MiseService.loadInfo(modelData.name);
+                            MiseService.loadInfo(modelData.name, modelData.scope);
                     }
                 }
                 DankActionButton {
