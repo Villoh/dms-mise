@@ -317,7 +317,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             height: pop.iconBtn
             // the label is what shrinks (elided) when the project name is long
-            readonly property real maxLabelW: pop.width - toolbarTabs.width - refreshBtn.width - Theme.spacingM * 4 - (Theme.iconSize - 6) * 2 - Theme.spacingXS * 2
+            readonly property real maxLabelW: pop.width - toolbarTabs.width - refreshBtn.width - (fixBtn.visible ? fixBtn.width + Theme.spacingXS : 0) - Theme.spacingM * 4 - (Theme.iconSize - 6) * 2 - Theme.spacingXS * 2
             width: scopeBtnRow.implicitWidth + Theme.spacingM * 2
             radius: Theme.cornerRadius
             color: pop.menuOpen || scopeHover.containsMouse ? Theme.primaryHoverLight : Theme.surfaceContainerHigh
@@ -370,6 +370,41 @@ Item {
                     size: Theme.iconSize - 6
                     color: Theme.surfaceVariantText
                 }
+            }
+        }
+
+        // what the warning of the picked scope asks for: `mise trust` (paranoid) or `mise lock`. First click arms, second runs.
+        DankActionButton {
+            id: fixBtn
+            property bool armed: false
+            readonly property var target: MiseService.warnedScope(pop.scope)   // undefined = nothing to fix
+            readonly property string kind: target === undefined ? "" : MiseService.warnOf(target)
+            readonly property string label: target === undefined ? "" : MiseService.scopeLabel(target)
+            visible: kind !== ""
+            anchors.right: scopeBtn.visible ? scopeBtn.left : refreshBtn.left
+            anchors.rightMargin: Theme.spacingXS
+            anchors.verticalCenter: parent.verticalCenter
+            buttonSize: pop.iconBtn
+            iconName: armed ? "check" : (kind === "untrusted" ? "gpp_maybe" : "lock")
+            iconColor: armed ? Theme.surface : Theme.warning
+            backgroundColor: armed ? Theme.warning : "transparent"
+            tooltipText: kind === "untrusted" ? (armed ? "Click again to run `mise trust` on " + label : "Not trusted: trust " + label + " (only if you wrote or reviewed its mise config)") : (armed ? "Click again to run `mise lock` on " + label : "Tools missing from the lockfile of " + label + ": run `mise lock`")
+            enabled: !MiseService.busy
+            onTargetChanged: armed = false
+            onKindChanged: armed = false
+            onClicked: {
+                if (!armed) {
+                    armed = true;
+                    fixReset.restart();
+                } else {
+                    armed = false;
+                    MiseService.fix(target);
+                }
+            }
+            Timer {
+                id: fixReset
+                interval: 3000
+                onTriggered: fixBtn.armed = false
             }
         }
 

@@ -816,9 +816,22 @@ Item {
     function warnOf(s) {
         return s ? (projectData[s] || {}).warn : globalUnlocked ? "unlocked" : "";
     }
+    // the first scope of `scope` ("*" = global, then every project) with something to say; undefined = none
+    function warnedScope(scope) {
+        return (scope === "*" ? [""].concat(scopes) : [scope]).find(x => warnOf(x));
+    }
     function scopeWarning(scope) {
-        const s = (scope === "*" ? [""].concat(scopes) : [scope]).find(x => warnOf(x));
+        const s = warnedScope(scope);
         return s === undefined ? "" : scopeLabel(s) + ": " + warnText[warnOf(s)];
+    }
+
+    // what the warning of a scope asks for, as a button would run it: `mise trust` on the project's config, or
+    // `mise lock` for its tools (`-g` for the global config). Only ever called from a button that asks twice.
+    function fix(scope) {
+        if (warnOf(scope) === "untrusted")
+            run(["trust", scope], "Trusting " + scopeLabel(scope), "Trusted " + scopeLabel(scope));
+        else
+            run(scope ? ["-C", projectDir(scope), "lock"] : ["lock", "-g"], "Locking " + scopeLabel(scope), "Locked " + scopeLabel(scope));
     }
 
     // project scopes run in the project's directory, so mise reads and rewrites that config
