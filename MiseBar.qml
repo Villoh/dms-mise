@@ -58,6 +58,9 @@ PluginComponent {
     horizontalBarPill: Component {
         Row {
             spacing: Theme.spacingXS
+            // the hat glyph has air inside its box, the digit has none: without this the whole thing
+            // sits to the right of the pill's centre
+            rightPadding: root.count > 0 || root.bumpCount > 0 ? Math.round(root.iconSize * 0.15) : 0
             MiseIcon {
                 size: root.iconSize
                 color: root.pillColor
@@ -70,6 +73,8 @@ PluginComponent {
                 font.pixelSize: Theme.fontSizeMedium
                 color: Theme.primary
                 anchors.verticalCenter: parent.verticalCenter
+                // a digit has no descender: the centre of its line box sits ~1px above the glyph
+                anchors.verticalCenterOffset: 1
             }
             Row {
                 visible: root.bumpCount > 0
@@ -86,6 +91,7 @@ PluginComponent {
                     font.pixelSize: Theme.fontSizeMedium
                     color: Theme.warning
                     anchors.verticalCenter: parent.verticalCenter
+                    anchors.verticalCenterOffset: 1
                 }
             }
         }
