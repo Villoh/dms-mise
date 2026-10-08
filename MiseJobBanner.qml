@@ -21,15 +21,21 @@ Rectangle {
         anchors.margins: Theme.spacingM
         spacing: 2
         Row {
+            width: parent.width
             spacing: Theme.spacingS
             DankIcon {
+                id: syncIcon
                 name: "sync"
                 size: Theme.iconSize - 6
                 color: Theme.primary
                 anchors.verticalCenter: parent.verticalCenter
             }
             StyledText {
+                width: Math.min(implicitWidth, parent.width - syncIcon.width - parent.spacing)
                 text: MiseJobs.label + "…"
+                elide: Text.ElideRight
+                wrapMode: Text.NoWrap
+                maximumLineCount: 1
                 font.pixelSize: Theme.fontSizeSmall
                 font.weight: Font.Medium
                 color: Theme.surfaceText
