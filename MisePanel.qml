@@ -385,7 +385,7 @@ Item {
         // what the warning of the picked scope asks for: `mise trust` (paranoid) or `mise lock`. First click arms, second runs.
         DankActionButton {
             id: fixBtn
-            property bool armed: false
+            readonly property bool armed: fixConfirm.armed
             readonly property var target: MiseService.warnedScope(pop.scope)   // undefined = nothing to fix
             readonly property string kind: target === undefined ? "" : MiseService.warnOf(target)
             readonly property string label: target === undefined ? "" : MiseProjects.label(target)
@@ -399,21 +399,12 @@ Item {
             backgroundColor: armed ? Theme.warning : "transparent"
             tooltipText: kind === "untrusted" ? (armed ? "Click again to run `mise trust` on " + label : "Not trusted: trust " + label + " (only if you wrote or reviewed its mise config)") : (armed ? "Click again to run `mise lock` on " + label : "Tools missing from the lockfile of " + label + ": run `mise lock`")
             enabled: !MiseJobs.busy
-            onTargetChanged: armed = false
-            onKindChanged: armed = false
-            onClicked: {
-                if (!armed) {
-                    armed = true;
-                    fixReset.restart();
-                } else {
-                    armed = false;
-                    MiseService.fix(target);
-                }
-            }
-            Timer {
-                id: fixReset
-                interval: 3000
-                onTriggered: fixBtn.armed = false
+            onTargetChanged: fixConfirm.cancel()
+            onKindChanged: fixConfirm.cancel()
+            onClicked: fixConfirm.click()
+            MiseConfirm {
+                id: fixConfirm
+                onConfirmed: MiseService.fix(fixBtn.target)
             }
         }
 
@@ -477,52 +468,11 @@ Item {
     }
 
     // ---- job banner: what mise is doing right now ----
-    Rectangle {
+    MiseJobBanner {
         id: banner
         anchors.top: toolbar.bottom
         anchors.topMargin: Theme.spacingS
         width: parent.width
-        visible: MiseJobs.busy
-        height: visible ? bannerCol.implicitHeight + Theme.spacingM * 2 : 0
-        radius: Theme.cornerRadius
-        color: Theme.withAlpha(Theme.primary, 0.10)
-        border.width: 1
-        border.color: Theme.withAlpha(Theme.primary, 0.30)
-
-        Column {
-            id: bannerCol
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            anchors.margins: Theme.spacingM
-            spacing: 2
-            Row {
-                spacing: Theme.spacingS
-                DankIcon {
-                    name: "sync"
-                    size: Theme.iconSize - 6
-                    color: Theme.primary
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-                StyledText {
-                    text: MiseJobs.label + "…"
-                    font.pixelSize: Theme.fontSizeSmall
-                    font.weight: Font.Medium
-                    color: Theme.surfaceText
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-            }
-            StyledText {
-                width: parent.width
-                text: MiseJobs.log.length ? MiseJobs.log[MiseJobs.log.length - 1] : ""
-                font.pixelSize: Theme.fontSizeSmall
-                font.family: Theme.monoFontFamily
-                color: Theme.surfaceVariantText
-                elide: Text.ElideRight
-                wrapMode: Text.NoWrap
-                maximumLineCount: 1
-            }
-        }
     }
 
     Connections {
@@ -629,7 +579,7 @@ Item {
     // rewrites pins in your config: arm first, click again to confirm
     DankButton {
         id: bumpAll
-        property bool armed: false
+        readonly property bool armed: bumpConfirm.armed
         visible: pop.tab === 0 && pop.scopedBumps > 0
         anchors.bottom: parent.bottom
         anchors.right: parent.right
@@ -640,26 +590,17 @@ Item {
         backgroundColor: armed ? Theme.error : Theme.warning
         textColor: Theme.surface
         enabled: !MiseJobs.busy
-        onClicked: {
-            if (!armed) {
-                armed = true;
-                bumpReset.restart();
-            } else {
-                armed = false;
-                MiseService.bumpAll(pop.scope);
-            }
-        }
-        Timer {
-            id: bumpReset
-            interval: 3000
-            onTriggered: bumpAll.armed = false
+        onClicked: bumpConfirm.click()
+        MiseConfirm {
+            id: bumpConfirm
+            onConfirmed: MiseService.bumpAll(pop.scope)
         }
     }
 
     // versions no config uses: arm first, click again to confirm
     DankButton {
         id: pruneAll
-        property bool armed: false
+        readonly property bool armed: pruneAllConfirm.armed
         visible: pop.tab === 1 && MiseService.prunableCount > 0
         anchors.bottom: parent.bottom
         width: parent.width
@@ -669,19 +610,10 @@ Item {
         backgroundColor: armed ? Theme.error : Theme.surfaceContainerHigh
         textColor: armed ? Theme.surface : Theme.surfaceText
         enabled: !MiseJobs.busy
-        onClicked: {
-            if (!armed) {
-                armed = true;
-                pruneAllReset.restart();
-            } else {
-                armed = false;
-                MiseService.prune("");
-            }
-        }
-        Timer {
-            id: pruneAllReset
-            interval: 3000
-            onTriggered: pruneAll.armed = false
+        onClicked: pruneAllConfirm.click()
+        MiseConfirm {
+            id: pruneAllConfirm
+            onConfirmed: MiseService.prune("")
         }
     }
 
@@ -920,7 +852,7 @@ Item {
             delegate: Rectangle {
                 id: row
                 required property var modelData
-                property bool confirm: false   // remove is two-step
+                readonly property bool confirm: removeConfirm.armed   // remove is two-step
                 readonly property string key: modelData.name + "|" + modelData.scope
                 readonly property bool open: pop.openRow === key
                 readonly property var info: MiseInfo.info[MiseInfo.infoKey(modelData.name, modelData.scope)] || ({})
@@ -932,7 +864,7 @@ Item {
                 }
                 // config says `latest`: the `latest` chip is the active one, the version it resolved to is just installed
                 readonly property bool trackLatest: ((info.meta || {}).requested_versions || []).includes("latest")
-                property bool pruneArmed: false   // prune is two-step, like remove
+                readonly property bool pruneArmed: pruneConfirm.armed   // prune is two-step, like remove
                 width: ListView.view ? ListView.view.width : 0
                 height: open ? pop.rowH + (modelData.template ? tplForm.implicitHeight : details.implicitHeight) + Theme.spacingS : pop.rowH
                 clip: true
@@ -948,10 +880,9 @@ Item {
                             pop.openRow = row.open ? "" : row.key;
                     }
                 }
-                Timer {
-                    id: confirmReset
-                    interval: 3000
-                    onTriggered: row.confirm = false
+                MiseConfirm {
+                    id: removeConfirm
+                    onConfirmed: MiseService.uninstall(row.modelData.name, row.modelData.scope)
                 }
                 Item {
                     id: head
@@ -1031,11 +962,8 @@ Item {
                             MiseService.upgrade(modelData.name, modelData.scope);
                         } else if (!modelData.installed) {
                             MiseService.install(modelData.name, pop.target);
-                        } else if (!row.confirm) {
-                            row.confirm = true;
-                            confirmReset.restart();
                         } else {
-                            MiseService.uninstall(modelData.name, modelData.scope);
+                            removeConfirm.click();
                         }
                     }
                 }
@@ -1301,10 +1229,9 @@ Item {
                                     color: row.pruneArmed ? Theme.surface : Theme.surfaceText
                                 }
                             }
-                            Timer {
-                                id: pruneReset
-                                interval: 3000
-                                onTriggered: row.pruneArmed = false
+                            MiseConfirm {
+                                id: pruneConfirm
+                                onConfirmed: MiseService.prune(MiseService.bareName(row.modelData.name))
                             }
                             MouseArea {
                                 id: pruneArea
@@ -1312,15 +1239,7 @@ Item {
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 enabled: !MiseJobs.busy
-                                onClicked: {
-                                    if (!row.pruneArmed) {
-                                        row.pruneArmed = true;
-                                        pruneReset.restart();
-                                    } else {
-                                        row.pruneArmed = false;
-                                        MiseService.prune(MiseService.bareName(row.modelData.name));
-                                    }
-                                }
+                                onClicked: pruneConfirm.click()
                             }
                         }
 
@@ -1329,7 +1248,7 @@ Item {
                             delegate: Rectangle {
                                 id: chip
                                 required property string modelData
-                                property bool armed: false   // removing a version is two-step
+                                readonly property bool armed: chipConfirm.armed   // removing a version is two-step
                                 readonly property bool have: ((row.info.meta || {}).installed_versions || []).includes(modelData)
                                 readonly property bool inUse: ((row.info.meta || {}).active_versions || []).includes(modelData)
                                 readonly property bool active: modelData === "latest" ? row.trackLatest : !row.trackLatest && inUse
@@ -1340,10 +1259,9 @@ Item {
                                 border.width: chip.active ? 2 : 1
                                 border.color: chip.active ? Theme.primary : Theme.withAlpha(Theme.outline, 0.4)
                                 opacity: MiseJobs.busy ? 0.5 : 1
-                                Timer {
-                                    id: chipReset
-                                    interval: 3000
-                                    onTriggered: chip.armed = false
+                                MiseConfirm {
+                                    id: chipConfirm
+                                    onConfirmed: MiseService.uninstallVersion(MiseService.bareName(row.modelData.name), chip.modelData)
                                 }
                                 MouseArea {
                                     id: chipArea
@@ -1396,15 +1314,7 @@ Item {
                                         hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
                                         enabled: !MiseJobs.busy
-                                        onClicked: {
-                                            if (!chip.armed) {
-                                                chip.armed = true;
-                                                chipReset.restart();
-                                            } else {
-                                                chip.armed = false;
-                                                MiseService.uninstallVersion(MiseService.bareName(row.modelData.name), chip.modelData);
-                                            }
-                                        }
+                                        onClicked: chipConfirm.click()
                                     }
                                 }
                             }
