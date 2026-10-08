@@ -382,13 +382,13 @@ Item {
             }
         }
 
-        // what the warning of the picked scope asks for: `mise trust` (paranoid) or `mise lock`. First click arms, second runs.
+        // what the warnings of the picked scope ask for, for all the scopes that ask the same: `mise trust` (paranoid) or `mise lock`. First click arms, second runs.
         DankActionButton {
             id: fixBtn
             property bool armed: false
-            readonly property var target: MiseService.warnedScope(pop.scope)   // undefined = nothing to fix
-            readonly property string kind: target === undefined ? "" : MiseService.warnOf(target)
-            readonly property string label: target === undefined ? "" : MiseService.scopeLabel(target)
+            readonly property var targets: MiseService.warnedScopes(pop.scope)   // [] = nothing to fix
+            readonly property string kind: targets.length ? MiseService.warnOf(targets[0]) : ""
+            readonly property string label: targets.map(s => MiseService.scopeLabel(s)).join(", ")
             visible: kind !== ""
             anchors.right: scopeBtn.visible ? scopeBtn.left : refreshBtn.left
             anchors.rightMargin: Theme.spacingXS
@@ -397,9 +397,9 @@ Item {
             iconName: armed ? "check" : (kind === "untrusted" ? "gpp_maybe" : "lock")
             iconColor: armed ? Theme.surface : Theme.warning
             backgroundColor: armed ? Theme.warning : "transparent"
-            tooltipText: kind === "untrusted" ? (armed ? "Click again to run `mise trust` on " + label : "Not trusted: trust " + label + " (only if you wrote or reviewed its mise config)") : (armed ? "Click again to run `mise lock` on " + label : "Tools missing from the lockfile of " + label + ": run `mise lock`")
+            tooltipText: kind === "untrusted" ? (armed ? "Click again to run `mise trust` on " + label : "Not trusted: trust " + label + " (only if you wrote or reviewed " + (targets.length > 1 ? "their mise configs" : "its mise config") + ")") : (armed ? "Click again to run `mise lock` on " + label : "Tools missing from the lockfile of " + label + ": run `mise lock`")
             enabled: !MiseService.busy
-            onTargetChanged: armed = false
+            onLabelChanged: armed = false
             onKindChanged: armed = false
             onClicked: {
                 if (!armed) {
@@ -407,7 +407,7 @@ Item {
                     fixReset.restart();
                 } else {
                     armed = false;
-                    MiseService.fix(target);
+                    MiseService.fix(targets);
                 }
             }
             Timer {

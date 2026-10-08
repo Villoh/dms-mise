@@ -817,7 +817,7 @@ Item {
         jobProc.running = true;
     }
 
-    // why a scope shows nothing ("" = nothing to say); `*` = the first project that has a reason
+    // why a scope shows nothing ("" = nothing to say)
     readonly property var warnText: ({
             untrusted: "not trusted, run `mise trust` there",
             unlocked: "tools missing from its lockfile, run `mise lock` (`-g` for global)"
@@ -826,22 +826,27 @@ Item {
     function warnOf(s) {
         return s ? (projectData[s] || {}).warn : globalUnlocked ? "unlocked" : "";
     }
-    // the first scope of `scope` ("*" = global, then every project) with something to say; undefined = none
-    function warnedScope(scope) {
-        return (scope === "*" ? [""].concat(scopes) : [scope]).find(x => warnOf(x));
+    // the scopes of `scope` ("*" = global, then every project) that ask for the same thing: trust first (an untrusted
+    // project cannot be locked), else lock. [] = nothing to fix.
+    function warnedScopes(scope) {
+        const w = (scope === "*" ? [""].concat(scopes) : [scope]).filter(x => warnOf(x));
+        const kind = w.some(x => warnOf(x) === "untrusted") ? "untrusted" : "unlocked";
+        return w.filter(x => warnOf(x) === kind);
     }
     function scopeWarning(scope) {
-        const s = warnedScope(scope);
-        return s === undefined ? "" : scopeLabel(s) + ": " + warnText[warnOf(s)];
+        const w = warnedScopes(scope);
+        return w.length ? (w.length > 1 ? w.length + " scopes" : scopeLabel(w[0])) + ": " + warnText[warnOf(w[0])] : "";
     }
 
-    // what the warning of a scope asks for, as a button would run it: `mise trust` on the project's config, or
-    // `mise lock` for its tools (`-g` for the global config). Only ever called from a button that asks twice.
-    function fix(scope) {
-        if (warnOf(scope) === "untrusted")
-            run(["trust", scope], "Trusting " + scopeLabel(scope), "Trusted " + scopeLabel(scope));
-        else
-            run(scope ? ["-C", projectDir(scope), "lock"] : ["lock", "-g"], "Locking " + scopeLabel(scope), "Locked " + scopeLabel(scope));
+    // `mise trust` on the config, or `mise lock` for its tools (`-g` for the global config), for every target. One
+    // failing does not stop the rest (it would stay first in line and block them); the job fails at the end.
+    readonly property string fixScript: 'k=$1; shift; rc=0\n' + 'while [ $# -gt 1 ]; do f=$1; d=$2; shift 2\n' + 'if [ "$k" = untrusted ]; then mise trust "$f"; elif [ -n "$f" ]; then mise -C "$d" lock; else mise lock -g; fi || rc=1\n' + 'done\nexit $rc'
+
+    // Only ever called from a button that asks twice. `targets` come from warnedScopes: all with the same warning.
+    function fix(targets) {
+        const trust = warnOf(targets[0]) === "untrusted";
+        const what = targets.length > 1 ? targets.length + " scopes" : scopeLabel(targets[0]);
+        run(["sh", "-c", fixScript, "sh", trust ? "untrusted" : "unlocked"].concat(targets.reduce((a, s) => a.concat([s, s ? projectDir(s) : ""]), [])), (trust ? "Trusting " : "Locking ") + what, (trust ? "Trusted " : "Locked ") + what);
     }
 
     // project scopes run in the project's directory, so mise reads and rewrites that config
