@@ -1,6 +1,6 @@
 # AGENTS.md
 
-DankMaterialShell plugin for mise (QML). Dev setup and reload rules: README → *Development*.
+DankMaterialShell plugin for mise (QML). Dev setup and reload rules: `docs/development.md`.
 
 ## Commits
 
@@ -29,5 +29,5 @@ Bump `version` in `plugin.json`, merge, then tag `vX.Y.Z` on `main`.
 
 - Style from theme tokens (spacing, radius, font sizes); no hardcoded sizes or fonts.
 - User-facing text and docs in English.
-- New user-visible behaviour updates README in the same PR.
+- New user-visible behaviour updates README or `docs/` in the same PR.
 - Format QML with the `qmlformat` that CI pins (`NIXPKGS` in `.github/workflows/ci.yml`): `nix shell "$NIXPKGS#qt6.qtdeclarative" -c qmlformat -i *.qml`. Other Qt versions format differently.
