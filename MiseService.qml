@@ -820,7 +820,7 @@ Item {
     // why a scope shows nothing ("" = nothing to say)
     readonly property var warnText: ({
             untrusted: "not trusted, run `mise trust` there",
-            unlocked: "tools missing from its lockfile, run `mise lock` (`-g` for global)"
+            unlocked: "tools missing from the lockfile, run `mise lock` (`-g` for global)"
         })
     property bool globalUnlocked: false   // `mise outdated` skipped global tools missing from the lockfile
     function warnOf(s) {
