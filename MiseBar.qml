@@ -7,7 +7,7 @@ PluginComponent {
     id: root
 
     layerNamespacePlugin: "mise"
-    popoutWidth: 460
+    popoutWidth: 540
     popoutHeight: 600
 
     // what the badge counts: global only (default) or every followed project too (Settings > Project tools)

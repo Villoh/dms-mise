@@ -18,7 +18,7 @@ PluginComponent {
     readonly property bool windowSupported: winLoader.status === Loader.Ready
     readonly property bool windowMode: windowSupported && root.pluginData?.panelMode === "window"
     readonly property string startTab: root.pluginData?.panelTab ?? "auto"
-    readonly property real panelW: Math.round(Theme.fontSizeMedium * 34)
+    readonly property real panelW: Math.round(Theme.fontSizeMedium * 38)
     readonly property real panelH: Math.round(Theme.fontSizeMedium * 46)
     readonly property bool shown: windowMode ? winLoader.item.visible : modal.shouldBeVisible
 
