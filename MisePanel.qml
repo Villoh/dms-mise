@@ -538,6 +538,7 @@ Item {
                 target: pop.target
                 draft: http
                 rowH: pop.rowH
+                controlH: pop.controlH
                 iconBtn: pop.iconBtn
                 chipH: pop.chipH
                 onToggled: pop.openRow = open ? "" : key
