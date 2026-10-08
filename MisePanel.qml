@@ -208,93 +208,11 @@ Item {
                 })));
     }
     readonly property int shown: tab === 0 ? updList.length : toolList.length
-    // the `http:` form lives here, not in its row: the list is rebuilt now and then, and a row would lose what you typed
-    property string httpName: ""
-    property string httpUrl: ""
-    property string httpList: ""
-    property string httpPaste: ""
-    property bool httpAdvanced: false
-    // the optional tool options, in the order they are written; empty = left out
-    property var httpOpt: ({
-            version_json_path: "",
-            version_regex: "",
-            version_order: ""   // "semver" = the list is not oldest-first
-            ,
-            strip_components: "",
-            bin_path: "",
-            rename_exe: "",
-            format: "",
-            checksum_url: ""
-        })
-    function setHttpOpt(k, v) {
-        const o = Object.assign({}, httpOpt);
-        o[k] = v;
-        httpOpt = o;
+    // the `http:` form's text lives here, not in its row: the list is rebuilt now and then, and a row would lose it
+    MiseHttpDraft {
+        id: http
+        active: pop.tab === 1
     }
-    // a labeled single-line field; `pop` is not visible inside an inline component, hence fieldHeight
-    component FormField: Column {
-        id: ff
-        property string label: ""
-        property string placeholder: ""
-        property string value: ""
-        property real fieldHeight: 0
-        signal edited(string text)
-        spacing: Theme.spacingXXS
-        StyledText {
-            width: parent.width
-            text: ff.label
-            font.pixelSize: Theme.fontSizeSmall
-            color: Theme.surfaceVariantText
-            elide: Text.ElideRight
-        }
-        DankTextField {
-            width: parent.width
-            height: ff.fieldHeight
-            placeholderText: ff.placeholder
-            text: ff.value
-            onTextEdited: ff.edited(text)
-        }
-    }
-
-    // fills the form from a pasted `[tools."http:name"]` block or `"http:name" = { … }` line. Keys are looked
-    // up one by one, so it works with newlines, spaces or neither (a single-line field may drop them).
-    function fillHttp(txt) {
-        // "double", 'single' (regexes) or a bare number
-        const val = k => {
-            const m = new RegExp("\\b" + k + "\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|(\\d+))").exec(txt);
-            return m ? (m[1] || m[2] || m[3] || "") : "";
-        };
-        const n = /http:([^"'\]\s=]+)/.exec(txt);
-        const url = val("url");
-        if (!n && !url)
-            return false;
-        if (n)
-            httpName = n[1];
-        if (url)
-            httpUrl = url;
-        const list = val("version_list_url");
-        if (list)
-            httpList = list;
-        // a paste replaces the options too, so nothing from an earlier one is left behind
-        const o = {};
-        Object.keys(httpOpt).forEach(k => o[k] = val(k));
-        httpOpt = o;
-        return true;
-    }
-
-    // once the fields stop changing, ask mise what the version list gives
-    onHttpSpecChanged: httpCheckDelay.restart()
-    Timer {
-        id: httpCheckDelay
-        interval: 600
-        onTriggered: {
-            if (pop.httpReady && pop.tab === 1)
-                MiseInfo.checkHttp(pop.httpSpec);
-        }
-    }
-    readonly property bool httpReady: httpName.trim() !== "" && httpUrl.trim() !== "" && httpList.trim() !== ""
-    // version_list_url is what lets `latest` resolve
-    readonly property string httpSpec: "http:" + httpName.trim() + "[url=" + httpUrl.trim() + ",version_list_url=" + httpList.trim() + Object.keys(httpOpt).filter(k => httpOpt[k].trim() !== "").map(k => "," + k + "=" + httpOpt[k].trim()).join("") + "]@latest"
 
     // ---- toolbar: tabs, scope picker, fix, refresh ----
     MisePanelToolbar {
@@ -814,198 +732,19 @@ Item {
                 }
 
                 // `http:` row, expanded: the options of an http-backend tool
-                Column {
+                MiseHttpForm {
                     id: tplForm
                     visible: row.open && modelData.template
-                    onVisibleChanged: {
-                        if (visible)
-                            httpCheckDelay.restart();
-                    }
                     anchors.top: head.bottom
                     anchors.left: rowIcon.right
                     anchors.right: parent.right
                     anchors.leftMargin: Theme.spacingM
                     anchors.rightMargin: Theme.spacingM
-                    spacing: Theme.spacingXS
-                    FormField {
-                        width: parent.width
-                        fieldHeight: pop.controlH
-                        label: "Paste a mise.toml block (optional)"
-                        placeholder: "[tools.\"http:name\"] …"
-                        value: pop.httpPaste
-                        onEdited: t => {
-                            pop.httpPaste = t;
-                            if (pop.fillHttp(t))
-                                pop.httpPaste = "";
-                        }
-                    }
-                    FormField {
-                        width: parent.width
-                        fieldHeight: pop.controlH
-                        label: "Name"
-                        placeholder: "devin"
-                        value: pop.httpName
-                        onEdited: t => pop.httpName = t
-                    }
-                    FormField {
-                        width: parent.width
-                        fieldHeight: pop.controlH
-                        label: "Download URL, with {{version}} in it"
-                        placeholder: "https://example.com/tool-{{version}}-linux-x64.tar.gz"
-                        value: pop.httpUrl
-                        onEdited: t => pop.httpUrl = t
-                    }
-                    FormField {
-                        width: parent.width
-                        fieldHeight: pop.controlH
-                        label: "Version list URL (what `latest` resolves from)"
-                        placeholder: "https://api.github.com/repos/OWNER/REPO/releases"
-                        value: pop.httpList
-                        onEdited: t => pop.httpList = t
-                    }
-                    FormField {
-                        width: parent.width
-                        fieldHeight: pop.controlH
-                        label: "Version path in that JSON (optional)"
-                        placeholder: ".[].tag_name"
-                        value: pop.httpOpt.version_json_path
-                        onEdited: t => pop.setHttpOpt("version_json_path", t)
-                    }
-                    FormField {
-                        width: parent.width
-                        fieldHeight: pop.controlH
-                        label: "Version regex, if the list is not JSON (optional)"
-                        placeholder: "my-tool-v(\\d+\\.\\d+\\.\\d+)\\.tar\\.gz"
-                        value: pop.httpOpt.version_regex
-                        onEdited: t => pop.setHttpOpt("version_regex", t)
-                    }
-                    // GitHub's releases come newest first, and mise takes the last entry as `latest`
-                    Item {
-                        width: parent.width
-                        height: pop.chipH
-                        Row {
-                            anchors.verticalCenter: parent.verticalCenter
-                            spacing: Theme.spacingXS
-                            DankIcon {
-                                anchors.verticalCenter: parent.verticalCenter
-                                name: pop.httpOpt.version_order === "semver" ? "check_box" : "check_box_outline_blank"
-                                size: Theme.iconSize - 4
-                                color: Theme.primary
-                            }
-                            StyledText {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "List is not oldest first (GitHub releases): order by version"
-                                font.pixelSize: Theme.fontSizeSmall
-                                color: Theme.surfaceText
-                            }
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: pop.setHttpOpt("version_order", pop.httpOpt.version_order === "semver" ? "" : "semver")
-                        }
-                    }
-                    Item {
-                        width: parent.width
-                        height: pop.chipH
-                        Row {
-                            anchors.verticalCenter: parent.verticalCenter
-                            spacing: Theme.spacingXS
-                            DankIcon {
-                                anchors.verticalCenter: parent.verticalCenter
-                                name: pop.httpAdvanced ? "expand_less" : "expand_more"
-                                size: Theme.iconSize - 4
-                                color: Theme.surfaceVariantText
-                            }
-                            StyledText {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "Advanced"
-                                font.pixelSize: Theme.fontSizeSmall
-                                color: Theme.surfaceVariantText
-                            }
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: pop.httpAdvanced = !pop.httpAdvanced
-                        }
-                    }
-                    Column {
-                        width: parent.width
-                        visible: pop.httpAdvanced
-                        spacing: Theme.spacingXS
-                        FormField {
-                            width: parent.width
-                            fieldHeight: pop.controlH
-                            label: "Directories to strip when extracting (mise guesses when empty)"
-                            placeholder: "1"
-                            value: pop.httpOpt.strip_components
-                            onEdited: t => pop.setHttpOpt("strip_components", t)
-                        }
-                        FormField {
-                            width: parent.width
-                            fieldHeight: pop.controlH
-                            label: "Folder with the binaries, inside the archive"
-                            placeholder: "bin"
-                            value: pop.httpOpt.bin_path
-                            onEdited: t => pop.setHttpOpt("bin_path", t)
-                        }
-                        FormField {
-                            width: parent.width
-                            fieldHeight: pop.controlH
-                            label: "Rename the executable to"
-                            placeholder: "my-tool"
-                            value: pop.httpOpt.rename_exe
-                            onEdited: t => pop.setHttpOpt("rename_exe", t)
-                        }
-                        FormField {
-                            width: parent.width
-                            fieldHeight: pop.controlH
-                            label: "Archive format, when the URL has no extension"
-                            placeholder: "tar.gz"
-                            value: pop.httpOpt.format
-                            onEdited: t => pop.setHttpOpt("format", t)
-                        }
-                        FormField {
-                            width: parent.width
-                            fieldHeight: pop.controlH
-                            label: "Checksum URL (used by `mise lock`, not by install)"
-                            placeholder: "https://example.com/tool-{{version}}.tar.gz.sha256"
-                            value: pop.httpOpt.checksum_url
-                            onEdited: t => pop.setHttpOpt("checksum_url", t)
-                        }
-                    }
-                    // the exact line `mise use` gets, and whether the list answers
-                    StyledText {
-                        width: parent.width
-                        visible: pop.httpReady
-                        text: pop.httpSpec
-                        wrapMode: Text.WrapAnywhere
-                        font.pixelSize: Theme.fontSizeSmall
-                        font.family: Theme.monoFontFamily
-                        color: Theme.surfaceVariantText
-                    }
-                    StyledText {
-                        width: parent.width
-                        visible: pop.httpReady
-                        readonly property var chk: MiseInfo.httpCheck
-                        readonly property bool fresh: chk.spec === pop.httpSpec
-                        text: !fresh || chk.pending ? "Checking the version list…" : chk.latest ? "✓ latest resolves to " + chk.latest : "✗ No versions found: check the list URL, the path and the regex"
-                        wrapMode: Text.Wrap
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: fresh && !chk.pending && !chk.latest ? Theme.error : Theme.surfaceVariantText
-                    }
-                    DankButton {
-                        width: parent.width
-                        text: "Install latest" + (pop.target ? MiseService.inLabel(pop.target) : "")
-                        iconName: "download"
-                        buttonHeight: pop.controlH
-                        enabled: pop.httpReady && !MiseJobs.busy
-                        onClicked: {
-                            MiseService.install(pop.httpSpec, pop.target);
-                            pop.openRow = "";
-                        }
-                    }
+                    draft: http
+                    target: pop.target
+                    controlH: pop.controlH
+                    chipH: pop.chipH
+                    onInstalled: pop.openRow = ""
                 }
 
                 // expanded: description, backend, installed versions, and the latest versions to pin
