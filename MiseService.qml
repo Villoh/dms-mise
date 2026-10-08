@@ -915,13 +915,24 @@ Item {
     }
 
     // ---- tool info (row expander): `mise tool --json` + the last versions from `mise ls-remote` ----
-    // name -> {meta, versions, metaError, versionsError}; undefined = not asked, null = in flight
+    // infoKey(name, scope) -> {meta, versions, metaError, versionsError}; undefined = not asked, null = in flight
     property var info: ({})
     readonly property int maxVersions: 20
 
     // `npm:foo@1.2` / `foo[opt=x]` -> `npm:foo`
     function bareName(n) {
         return n.replace(/\[.*\]$/, "").replace(/@[^/@:]*$/, "");
+    }
+
+    // "name|scope": a tool answers per scope (active versions differ between global and a project)
+    function infoKey(name, scope) {
+        return bareName(name) + "|" + scope;
+    }
+
+    // run a mise command for an info key, in its scope
+    function infoArgs(k, args) {
+        const i = k.indexOf("|");
+        return inDir(k.slice(i + 1), args(k.slice(0, i)));
     }
 
     function setInfo(n, patch) {
@@ -931,8 +942,8 @@ Item {
     }
 
     // cached after the first answer; a failed one is retried the next time the row opens
-    function loadInfo(name) {
-        const n = bareName(name);
+    function loadInfo(name, scope) {
+        const n = infoKey(name, scope);
         const i = info[n] || {};
         if (i.meta === undefined) {
             setInfo(n, {
@@ -988,7 +999,7 @@ Item {
 
     Ask {
         id: metaAsk
-        args: t => ["tool", "--json", t]
+        args: t => root.infoArgs(t, n => ["tool", "--json", n])
         onAnswer: (tool, body) => {
             try {
                 root.setInfo(tool, {
@@ -1005,7 +1016,7 @@ Item {
 
     Ask {
         id: versionsAsk
-        args: t => ["ls-remote", t]
+        args: t => root.infoArgs(t, n => ["ls-remote", n])
         // oldest first -> newest first
         onAnswer: (tool, body) => {
             const v = body.split("\n").map(x => x.trim()).filter(x => x).slice(-root.maxVersions).reverse();
