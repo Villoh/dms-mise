@@ -46,7 +46,7 @@ Item {
         onTriggered: pop.checkingShown = false
     }
 
-    readonly property string summary: MiseService.error || MiseService.scopeWarning(scope) || ((count > 0 ? count + " outdated" : (MiseService.scopes.length ? scopeName + " is up to date" : "All up to date")) + (bumpCount ? " · " + bumpCount + " bumpable" : "") + " · " + installedRows.length + " installed" + checkedText)
+    readonly property string summary: MiseService.error || MiseService.scopeWarning(scope) || ((count > 0 ? count + " outdated" : (MiseService.scopes.length ? scopeName + " is up to date" : "All up to date")) + (bumpCount ? " · " + bumpCount + " bumpable" : "") + " · " + installedRows.filter(r => r.installed).length + " installed" + checkedText)
 
     // on open. "updates" / "tools" are fixed; anything else is auto:
     // Updates if something is pending (updates or bumps), Tools otherwise
@@ -155,6 +155,15 @@ Item {
                     installed: true,
                     direct: false,
                     sub: (v[n] || "") + (showScope ? (v[n] ? " · " : "") + MiseService.scopeLabel(s) : "")
+                }));
+            // declared but not installed: listed apart, with the install button
+            MiseService.missingIn(s).forEach(n => out.push({
+                    name: n,
+                    scope: s,
+                    installed: false,
+                    missing: true,
+                    direct: false,
+                    sub: (v[n] || "") + " · not installed" + (showScope ? " · " + MiseService.scopeLabel(s) : "")
                 }));
         });
         return out.sort((a, b) => a.name.localeCompare(b.name) || a.scope.localeCompare(b.scope));
@@ -568,7 +577,7 @@ Item {
         onAccepted: {
             if (pop.tab !== 1 || MiseService.busy)
                 return;
-            const r = pop.toolList.find(x => !x.installed && !x.template);
+            const r = pop.toolList.find(x => !x.installed && !x.missing && !x.template);
             if (r)
                 MiseService.install(r.name, pop.target);
         }
@@ -845,7 +854,7 @@ Item {
                     }
                     StyledText {
                         width: parent.width
-                        text: modelData.ignoredKey ? (modelData.latest ? "skipping " + modelData.latest : "ignored · all versions") : modelData.current + " → " + modelData.latest + (modelData.bump ? " · bump (requested " + modelData.requested + ")" : "") + (pop.showScope ? " · " + MiseService.scopeLabel(modelData.scope) : "")
+                        text: modelData.ignoredKey ? (modelData.latest ? "skipping " + modelData.latest : "ignored · all versions") : (modelData.current ? modelData.current + " → " : "not installed → ") + modelData.latest + (modelData.bump ? " · bump (requested " + modelData.requested + ")" : "") + (pop.showScope ? " · " + MiseService.scopeLabel(modelData.scope) : "")
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.surfaceVariantText
                         elide: Text.ElideRight
@@ -891,7 +900,7 @@ Item {
                         iconSize: pop.actionIcon
                         iconName: modelData.bump ? "upgrade" : "download"
                         iconColor: modelData.bump ? Theme.warning : Theme.primary
-                        tooltipText: modelData.bump ? "Bump: rewrites \"" + modelData.requested + "\" in your " + (modelData.scope ? "project's" : "global") + " mise config" : "Update"
+                        tooltipText: modelData.bump ? "Bump: rewrites \"" + modelData.requested + "\" in your " + (modelData.scope ? "project's" : "global") + " mise config" : (modelData.current ? "Update" : "Install")
                         enabled: !MiseService.busy
                         onClicked: modelData.bump ? MiseService.bump(modelData.name, modelData.scope) : MiseService.upgrade(modelData.name, modelData.scope)
                     }
@@ -1015,10 +1024,12 @@ Item {
                     iconName: modelData.installed ? (row.confirm ? "check" : "delete") : "download"
                     iconColor: modelData.installed ? (row.confirm ? Theme.surface : Theme.error) : Theme.primary
                     backgroundColor: row.confirm ? Theme.error : "transparent"
-                    tooltipText: modelData.installed ? (row.confirm ? "Click again to remove" : "Remove" + MiseService.inLabel(modelData.scope)) : "Install latest" + (pop.target ? MiseService.inLabel(pop.target) : "")
+                    tooltipText: modelData.installed ? (row.confirm ? "Click again to remove" : "Remove" + MiseService.inLabel(modelData.scope)) : (modelData.missing ? "Install the declared version" + MiseService.inLabel(modelData.scope) : "Install latest" + (pop.target ? MiseService.inLabel(pop.target) : ""))
                     enabled: !MiseService.busy
                     onClicked: {
-                        if (!modelData.installed) {
+                        if (modelData.missing) {
+                            MiseService.upgrade(modelData.name, modelData.scope);
+                        } else if (!modelData.installed) {
                             MiseService.install(modelData.name, pop.target);
                         } else if (!row.confirm) {
                             row.confirm = true;

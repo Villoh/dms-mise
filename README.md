@@ -14,8 +14,8 @@ Pill with a chef hat icon. Two counters appear next to it: updates (primary colo
 
 Click it for the popout:
 
-- **Updates**: outdated tools (`current → latest`), filter box, backend chips, per-tool download button, and **Update all** at the bottom. If some tools are pinned or have a newer major, **Bump all** appears next to it (click twice to confirm).
-- **Tools**: your installed tools (version, remove). Type to search installed tools and the mise registry; the download icon installs. Enter installs the first result not yet installed.
+- **Updates**: outdated tools (`current → latest`; `not installed → version` for a tool your config declares but that is not installed yet, whose button installs it), filter box, backend chips, per-tool download button, and **Update all** at the bottom. If some tools are pinned or have a newer major, **Bump all** appears next to it (click twice to confirm).
+- **Tools**: your installed tools (version, remove). A tool your config declares but that is not installed shows `not installed` with a download button (installs the declared version) and does not count as installed. Type to search installed tools and the mise registry; the download icon installs. Enter installs the first result not yet installed.
 - Refresh button checks on demand: the icon spins on hover and the button turns into a spinner while checking (held briefly so quick checks stay visible). A banner shows what mise is doing and its last output line; failures show the last lines of output in a toast.
 
 Each update row can be **skipped** (`skip_next`: that target version only, it shows again when a newer one appears) or **ignored** (`visibility_off`: the tool, whatever the version). Ignored items are not counted in the badge and are left out of *Update all*, *Bump all* and the launcher. The `ignored N` chip lists them with an undo button. Also listed, with undo and *Clear all*, in Settings → Plugins → mise. Stored in the plugin state (`~/.local/state/DankMaterialShell/plugins/mise_state.json`), not in your mise config. Handy for a release that fails to install (e.g. a badly published npm package that `aube` rejects).

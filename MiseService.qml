@@ -11,7 +11,8 @@ Item {
     property var outdatedRaw: []  // [{name, requested, current, latest}] as mise reports them
     property var ignored: []      // "name" (all versions) or "name@version" (skip that target version)
     readonly property var outdated: outdatedRaw.concat(projectOutdated).filter(t => !isIgnored(t.name, t.latest))
-    property var installed: []   // ["node", "pipx:harlequin", ...]
+    property var installed: []   // really installed: ["node", "pipx:harlequin", ...]
+    property var missing: []     // declared in the global config but not installed (mise lists them too)
     property var versions: ({})  // name -> active version
     property var prunable: ({})  // name -> [versions] no tracked config uses (`mise ls --prunable`)
     readonly property int prunableCount: Object.keys(prunable).reduce((n, k) => n + prunable[k].length, 0)
@@ -160,7 +161,12 @@ Item {
     }
 
     function installedIn(scope) {
-        return scope ? Object.keys(toolsIn(scope)).sort() : installed;
+        return scope ? Object.keys(toolsIn(scope)).filter(n => !missingIn(scope).includes(n)).sort() : installed;
+    }
+
+    // declared in that config, not installed yet: `mise upgrade <tool>` installs the declared version
+    function missingIn(scope) {
+        return scope ? Object.keys((projectData[scope] || {}).missing || {}).sort() : missing;
     }
 
     // Two saves, and each one fires onPluginStateChanged synchronously: reloading in between would
@@ -250,6 +256,7 @@ Item {
                 outdated: [],
                 bump: [],
                 tools: {},
+                missing: {},
                 warn: ""
             });
         if (kind === "warn") {
@@ -261,8 +268,11 @@ Item {
             Object.keys(d).forEach(n => {
                 const own = (d[n] || []).filter(x => x.source && x.source.path === path);
                 const x = own.find(y => y.active) || own[0];
-                if (x)
-                    e.tools[n] = x.version || x.requested_version || "";
+                if (!x)
+                    return;
+                e.tools[n] = x.version || x.requested_version || "";
+                if (!own.some(y => y.installed))
+                    e.missing[n] = true;
             });
             return;
         }
@@ -306,7 +316,7 @@ Item {
         if (!q)
             return [];
         const out = [];
-        const isInstalled = n => sc ? n in toolsHere : installed.includes(n);
+        const isInstalled = n => sc ? n in toolsHere : installed.includes(n) || missing.includes(n);
         // name without `[opts]` / `@version`  (npm:@scope/pkg keeps its @)
         const bare = raw.replace(/\[.*\]$/, "").replace(/@[^/@:]*$/, "");
         const base = bare.toLowerCase();
@@ -1132,9 +1142,12 @@ Item {
             onStreamFinished: {
                 try {
                     const d = JSON.parse(text);
-                    root.installed = Object.keys(d);
+                    const keys = Object.keys(d);
+                    const has = k => d[k].some(x => x.installed);
+                    root.installed = keys.filter(has);
+                    root.missing = keys.filter(k => !has(k));
                     const v = {};
-                    root.installed.forEach(k => v[k] = (d[k].find(x => x.active) || d[k][0] || {}).version || "");
+                    keys.forEach(k => v[k] = (d[k].find(x => x.active) || d[k][0] || {}).version || "");
                     root.versions = v;
                 } catch (e) {}
             }
