@@ -3,6 +3,7 @@ singleton MiseRemote 1.0 MiseRemote.qml
 singleton MiseJobs 1.0 MiseJobs.qml
 singleton MiseInfo 1.0 MiseInfo.qml
 singleton MiseProjects 1.0 MiseProjects.qml
+singleton MiseConfig 1.0 MiseConfig.qml
 MisePanel 1.0 MisePanel.qml
 MisePanelToolbar 1.0 MisePanelToolbar.qml
 MiseJobBanner 1.0 MiseJobBanner.qml
@@ -11,6 +12,7 @@ MiseConfirm 1.0 MiseConfirm.qml
 MiseHttpDraft 1.0 MiseHttpDraft.qml
 MiseHttpForm 1.0 MiseHttpForm.qml
 MiseUpdateRow 1.0 MiseUpdateRow.qml
+MiseConfigRow 1.0 MiseConfigRow.qml
 MiseToolRow 1.0 MiseToolRow.qml
 MiseToolDetails 1.0 MiseToolDetails.qml
 MiseVersionChip 1.0 MiseVersionChip.qml

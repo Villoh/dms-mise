@@ -259,3 +259,36 @@ function search(query, ctx) {
         }));
     return out;
 }
+
+// `mise settings ls --all --json-extended` -> [{key, type, value, desc, set, section}]. Nested groups become
+// dotted keys (`npm.package_manager`); arrays show as `a,b`, the form `mise settings set` takes back. Only a
+// setting the user wrote in a config carries a `source`. Sections: "Configured" (those, first), then
+// "General" (no group) and one per group (`npm`, `github`...), alphabetical.
+function parseSettings(json) {
+    const out = [];
+    const walk = (prefix, o) => Object.keys(o).forEach(k => {
+        const v = o[k];
+        if (!v || typeof v !== "object")
+            return;
+        if ("type" in v && "description" in v)
+            out.push({
+                key: prefix + k,
+                type: v.type,
+                value: Array.isArray(v.value) ? v.value.join(",") : String(v.value ?? ""),
+                desc: v.description || "",
+                set: !!v.source,
+                section: v.source ? "Configured" : prefix ? prefix.slice(0, -1) : "General"
+            });
+        else
+            walk(prefix + k + ".", v);
+    });
+    walk("", json);
+    const rank = s => (s === "Configured" ? 0 : s === "General" ? 1 : 2);
+    return out.sort((a, b) => rank(a.section) - rank(b.section) || a.section.localeCompare(b.section) || a.key.localeCompare(b.key));
+}
+
+// settings whose name or description contains `q` (case-insensitive)
+function filterSettings(list, q) {
+    const t = q.trim().toLowerCase();
+    return t ? list.filter(s => s.key.includes(t) || s.desc.toLowerCase().includes(t)) : list;
+}

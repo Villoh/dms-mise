@@ -3,13 +3,13 @@ import qs.Common
 import qs.Services
 import qs.Widgets
 
-// Top row of the panel: Updates / Tools tabs, the scope picker button (projects on), the fix button when
+// Top row of the panel: Updates / Tools / Settings tabs, the scope picker button (projects on), the fix button when
 // the picked scope needs `mise trust` / `mise lock`, and refresh.
 Item {
     id: toolbar
 
     property int count: 0            // pending updates, shown on the Updates tab
-    property int tab: 0              // 0 = updates, 1 = tools
+    property int tab: 0              // 0 = updates, 1 = tools, 2 = settings (mise settings: no scope, no fix)
     property string scope: ""
     property string scopeName: ""
     property bool menuOpen: false
@@ -31,7 +31,7 @@ Item {
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
         buttonHeight: toolbar.iconBtn
-        model: ["Updates" + (toolbar.count > 0 ? " (" + toolbar.count + ")" : ""), "Tools"]
+        model: ["Updates" + (toolbar.count > 0 ? " (" + toolbar.count + ")" : ""), "Tools", "Settings"]
         currentIndex: toolbar.tab
         onSelectionChanged: (index, selected) => {
             if (selected)
@@ -42,7 +42,7 @@ Item {
     // scope picker: one compact button instead of a chip row, so it scales to any number of projects
     Rectangle {
         id: scopeBtn
-        visible: MiseProjects.mode !== "off"
+        visible: MiseProjects.mode !== "off" && toolbar.tab !== 2
         anchors.right: refreshBtn.left
         anchors.rightMargin: Theme.spacingXS
         anchors.verticalCenter: parent.verticalCenter
@@ -109,7 +109,7 @@ Item {
     DankActionButton {
         id: fixBtn
         readonly property string kind: toolbar.fixKind
-        visible: kind !== ""
+        visible: kind !== "" && toolbar.tab !== 2
         anchors.right: scopeBtn.visible ? scopeBtn.left : refreshBtn.left
         anchors.rightMargin: Theme.spacingXS
         anchors.verticalCenter: parent.verticalCenter
