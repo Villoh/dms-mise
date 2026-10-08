@@ -2,7 +2,7 @@
   "id": "mise",
   "name": "mise",
   "description": "Manage mise tools from DMS: bar widget, keybind panel and launcher to update, bump, install and remove.",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "author": "Villoh",
   "icon": "package_2",
   "type": "composite",
