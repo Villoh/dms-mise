@@ -196,7 +196,17 @@ ln -s "$PWD" ~/.config/DankMaterialShell/plugins/mise
 dms ipc call plugins reload mise
 ```
 
-`reload` is enough for `MiseBar.qml` / `MiseLauncher.qml` / `MiseDaemon.qml` edits. `MiseService.qml` is a singleton and `MisePanel.qml` is registered, both through `qmldir`, and `plugin.json` is read at scan time: for those, run `dms restart`.
+`reload` is enough for `MiseBar.qml` / `MiseLauncher.qml` / `MiseDaemon.qml` edits. `MiseService.qml` is a singleton and `MisePanel.qml` is registered, both through `qmldir`, `MiseSearch.js` is a `.pragma library` cached for the life of the engine, and `plugin.json` is read at scan time: for those, run `dms restart`.
+
+### Tests
+
+The search, ranking and verification logic has no Quickshell dependency (`MiseSearch.js`) and is tested against recorded API answers in `tests/fixtures/`, with Node's standard library only:
+
+```sh
+node --test tests/
+```
+
+CI runs the same command with the `nodejs` pinned in `.github/workflows/ci.yml`. To refresh a fixture, save the answer of the URL in `MiseSearch.js` (`searchers` / `verifiers`), trimmed to the fields the parser reads.
 
 Logo: `assets/mise.svg`, from <https://mise.jdx.dev/logo.svg>. The bar pill uses the `chef_hat` icon from Material Symbols instead: the logo line art is too fine to read at bar size.
 

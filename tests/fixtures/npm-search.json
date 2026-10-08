@@ -1,0 +1,34 @@
+{
+  "objects": [
+    {
+      "package": {
+        "name": "playwright",
+        "description": "A high-level API to automate web browsers"
+      }
+    },
+    {
+      "package": {
+        "name": "@playwright/mcp",
+        "description": "Playwright Tools for MCP"
+      }
+    },
+    {
+      "package": {
+        "name": "@vitest/browser-playwright",
+        "description": "Browser running for Vitest using playwright"
+      }
+    },
+    {
+      "package": {
+        "name": "allure-playwright",
+        "description": "Allure Playwright integration"
+      }
+    },
+    {
+      "package": {
+        "name": "@playwright/cli",
+        "description": "Playwright CLI"
+      }
+    }
+  ]
+}

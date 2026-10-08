@@ -1,0 +1,7 @@
+{
+  "info": {
+    "name": "ruff",
+    "summary": "An extremely fast Python linter and code formatter, written in Rust.",
+    "version": "0.16.10"
+  }
+}

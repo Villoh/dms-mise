@@ -1,0 +1,29 @@
+{
+  "crates": [
+    {
+      "name": "ripgrep",
+      "description": "ripgrep is a line-oriented search tool that recursively searches the current\ndirectory for a regex pattern while respecting gitignore rules. ripgrep has\nfirst class support on Windows, macOS and Linux.\n"
+    },
+    {
+      "name": "gist-search",
+      "description": "Indexed code search for Rust - ripgrep-parity regex search over a persisted trigram index, with ranked definition-first results."
+    },
+    {
+      "name": "cgx-core",
+      "description": "Core library for cgx, the Rust equivalent of uvx or npx for running Rust crates quickly and easily"
+    },
+    {
+      "name": "cgx",
+      "description": "Rust equivalent of uvx or npx, for running Rust crates quickly and easily"
+    },
+    {
+      "name": "ripgrep-edit",
+      "description": "Edit ripgrep search results across multiple files"
+    }
+  ],
+  "meta": {
+    "total": 727,
+    "next_page": "?per_page=5&q=ripgrep&seek=W2ZhbHNlLDMuNCwzNCwyODE2NTU3XQ",
+    "prev_page": null
+  }
+}

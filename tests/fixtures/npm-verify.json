@@ -1,0 +1,5 @@
+{
+  "name": "playwright",
+  "version": "1.64.0",
+  "description": "A high-level API to automate web browsers"
+}

@@ -1,0 +1,14 @@
+{
+  "id": 586920414,
+  "name": "mise",
+  "full_name": "jdx/mise",
+  "html_url": "https://github.com/jdx/mise",
+  "description": "dev tools, env vars, task runner",
+  "stargazers_count": 34779,
+  "archived": false,
+  "default_branch": "main",
+  "owner": {
+    "login": "jdx",
+    "type": "User"
+  }
+}
