@@ -889,7 +889,17 @@ Item {
 
     // scope "" / omitted = global config, otherwise the project's config file path
     function install(tool, scope) {
-        run(scope ? ["use", "--path", scope, "--yes", tool] : ["use", "--global", "--yes", tool], "Installing " + tool + inLabel(scope), "Installed " + tool + inLabel(scope), lockedInstall(tool, scope));
+        const use = scope ? ["use", "--path", scope, "--yes", tool] : ["use", "--global", "--yes", tool];
+        runMany(installUnlocked ? [use] : [use, lockAfterUse(tool, scope)], "Installing " + tool + inLabel(scope), "Installed " + tool + inLabel(scope), lockedInstall(tool, scope));
+    }
+
+    // Under `locked = true`, `use` of a version that is already installed (another scope has it) needs no download:
+    // it writes the config, exits 0 and leaves the lockfile without the entry. Lock it, but only when `locked` is on:
+    // `mise lock` would create a lockfile nobody asked for.
+    readonly property string lockAfterUseScript: 'd=${1:-$HOME}; [ "$(mise -C "$d" settings get locked 2>/dev/null)" = true ] || exit 0\n' + 'if [ -n "$1" ]; then mise -C "$1" lock "$2"; else mise lock -g "$2"; fi'
+
+    function lockAfterUse(tool, scope) {
+        return ["sh", "-c", lockAfterUseScript, "sh", scope ? projectDir(scope) : "", bareName(tool)];
     }
 
     // With `locked = true` mise refuses `use` for a tool the lockfile lacks. What the user would do by hand: write the
