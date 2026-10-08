@@ -786,18 +786,20 @@ Item {
         refreshProjects();
     }
 
-    function run(args, label, doneMsg) {
-        runMany([args], label, doneMsg);
+    function run(args, label, doneMsg, fallback) {
+        runMany([args], label, doneMsg, fallback);
     }
 
     // commands run one after another; the first failure stops the rest
-    function runMany(cmds, label, doneMsg) {
+    // `fallback`: a command to try, once, if the first one is refused for a missing lockfile entry
+    function runMany(cmds, label, doneMsg, fallback) {
         if (busy) {
             ToastService.showError("mise", "Another job is running");
             return;
         }
         jobProc.doneMsg = doneMsg;
         jobProc.queue = cmds.slice(1);
+        jobProc.fallback = fallback || [];
         jobProc.prepare(cmds[0]);
         jobLabel = label;
         jobLog = [];
@@ -864,7 +866,24 @@ Item {
 
     // scope "" / omitted = global config, otherwise the project's config file path
     function install(tool, scope) {
-        run(scope ? ["use", "--path", scope, "--yes", tool] : ["use", "--global", "--yes", tool], "Installing " + tool + inLabel(scope), "Installed " + tool + inLabel(scope));
+        run(scope ? ["use", "--path", scope, "--yes", tool] : ["use", "--global", "--yes", tool], "Installing " + tool + inLabel(scope), "Installed " + tool + inLabel(scope), lockedInstall(tool, scope));
+    }
+
+    // With `locked = true` mise refuses `use` for a tool the lockfile lacks. What the user would do by hand: write the
+    // tool into the config, lock it, install it. `config set` only writes a plain `name = "version"`, so tools with
+    // [options], a dotted name (it would split the key) are left out and fail with failureSummary's hint. One the config declares with options (a
+    // table or a list) is refused by the script itself, reading the toml: `config set` would overwrite them, while
+    // a plain version is rewritten, as `mise use` does. `config set` makes a paranoid config untrusted
+    // (its hash changed): if the file loaded before our edit and no longer does, it is trusted again, like mise does
+    // for its own rewrites. One that did not load before stays as it is.
+    readonly property string lockedScript: 'f=$1; [ -n "$f" ] || f=${MISE_GLOBAL_CONFIG_FILE:-$HOME/.config/mise/config.toml}\n' + 'v=$(mise config get -f "$f" "tools.$3" 2>/dev/null) && case "$v" in *=*|"["*) echo "ERROR: $3 has options in $f: change it there by hand" >&2; exit 1;; esac\n' + 'if [ -n "$1" ]; then\n' + 'mise -C "$2" ls --json >/dev/null 2>&1 && t=1\n' + 'mise config set -f "$1" "tools.$3" "$4" && { mise -C "$2" ls --json >/dev/null 2>&1 || [ -z "$t" ] || mise trust "$1"; } && mise -C "$2" lock "$3" && mise -C "$2" install --yes "$3"\n' + 'else\n' + 'mise config set -f "$f" "tools.$3" "$4" && mise lock -g "$3" && mise install --yes "$3"\n' + 'fi'
+
+    function lockedInstall(tool, scope) {
+        const n = bareName(tool);
+        const v = tool.substring(n.length + 1) || "latest";
+        if (!/^[\w:@\/-]+$/.test(n) || !/^[\w.-]+$/.test(v) || (tool !== n && tool[n.length] !== "@"))
+            return [];
+        return ["sh", "-c", lockedScript, "sh", scope || "", scope ? projectDir(scope) : "", n, v];
     }
 
     // removes from that config and prunes the installed version
@@ -1027,6 +1046,8 @@ Item {
 
     // the useful lines of a failed job (the tail is mostly mise's own "Version:/Location:" footer)
     function failureSummary() {
+        if (jobLog.some(l => /No lockfile URL|not in the lockfile/.test(l)))
+            return "`locked = true`: mise installs nothing the lockfile lacks. Add the tool to your mise config, run `mise lock`, then `mise install` (or turn on Install with `locked` off in Settings).";
         const hit = jobLog.filter(l => /×|│|ERROR|hint:|failed|mismatch|not found|denied|404|403/i.test(l) && !/Version:|--verbose|BACKTRACE/i.test(l));
         return (hit.length ? hit : jobLog).slice(-4).join("\n");
     }
@@ -1196,6 +1217,7 @@ Item {
         id: jobProc
         property string doneMsg: ""
         property var queue: []   // commands still to run after this one
+        property var fallback: []   // see runMany
         // verbose so a failure carries the backend's own reason (aube/npm/uv...), not just "exit code 1".
         // With `locked = true` mise refuses `use` for a tool the lockfile does not know (No lockfile URL found).
         // Only when the user allows it in Settings, `use` runs unlocked and mise writes the lockfile entries.
@@ -1205,7 +1227,7 @@ Item {
             }, args[0] === "use" && root.installUnlocked ? {
                 MISE_LOCKED: "0"
             } : {});
-            command = ["mise"].concat(args);
+            command = args[0] === "sh" ? args : ["mise"].concat(args);
         }
         stdout: SplitParser {
             onRead: l => root.pushLog(l)
@@ -1214,6 +1236,14 @@ Item {
             onRead: l => root.pushLog(l)
         }
         onExited: code => {
+            if (code !== 0 && fallback.length && !root.installUnlocked && root.jobLog.some(l => /No lockfile URL|not in the lockfile/.test(l))) {
+                const f = fallback;
+                fallback = [];
+                root.jobLog = [];
+                prepare(f);
+                Qt.callLater(() => jobProc.running = true);
+                return;
+            }
             if (code === 0 && queue.length) {
                 prepare(queue[0]);
                 queue = queue.slice(1);

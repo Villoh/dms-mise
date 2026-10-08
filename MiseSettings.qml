@@ -113,7 +113,7 @@ PluginSettings {
     ToggleSetting {
         settingKey: "installUnlocked"
         label: "Install with `locked` off"
-        description: "With `locked = true` in your mise settings, Install fails for a tool the lockfile does not have yet (run `mise lock` yourself). On: Install runs with `locked` off, so mise adds the tool to the lockfile. Update and Bump always follow your settings."
+        description: "With `locked = true`, Install already works for plain tools (it writes the config, runs `mise lock`, then installs). Tools with [options] or a `.` in the name fail with a hint. On: Install runs with `locked` off for those too, and mise adds them to the lockfile. Update and Bump always follow your settings."
         defaultValue: false
     }
 

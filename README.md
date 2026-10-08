@@ -155,7 +155,7 @@ Settings → Plugins → mise: check interval (15 min, 30 min, 1 h, 4 h, daily).
 | GitHub token | `mise token github --raw` (once per session, on the first GitHub request) |
 | Update | `mise upgrade --yes [tool]` (`mise -C <project> upgrade ...` for a project) |
 | Bump | `mise upgrade --bump --yes <tool>` (same `-C`) |
-| Install | `mise use --global --yes <tool>`, or `mise use --path <config> --yes <tool>` for a project (with `MISE_LOCKED=0` if *Install with `locked` off* is on, see *Your mise settings*) |
+| Install | `mise use --global --yes <tool>`, or `mise use --path <config> --yes <tool>` for a project (under `locked = true` see *Your mise settings*) |
 | Details | `mise tool --json <tool>`, `mise ls-remote <tool>` (30 s timeout, only when a row is expanded) |
 | Remove a version | `mise uninstall --yes <tool>@<version>` |
 | Prune | `mise ls --prunable --json` (with every check), `mise prune --tools --yes [tool]` |
@@ -169,8 +169,8 @@ The plugin only runs `mise` and never edits its settings; it works with these:
 
 | Setting | What happens |
 | --- | --- |
-| `locked = true` | Respected. `mise use` refuses a tool the lockfile has no URL for, so *Install* fails with mise's own message (`No lockfile URL found`). Run `mise lock` yourself, or turn on *Install with `locked` off* in Settings: only Install then runs with `MISE_LOCKED=0` and mise writes the entries for every platform into the lockfile, if one exists (`lockfile = true` alone does not create it: run `mise lock` once in a project). Update and Bump always run with your settings. |
-| `paranoid = true` / untrusted configs | A project config has to be trusted by hand (`mise trust`), and again each time its content changes outside mise. Until then the project shows nothing and the popout says `not trusted, run mise trust there`. The plugin never trusts anything for you. |
+| `locked = true` | Respected. `mise use` refuses a tool the lockfile has no entry for, so for a plain tool (`name` or `name@version`, not already in that config) *Install* does what you would by hand: `mise config set` writes it to the config, `mise lock` locks it, `mise install` installs it. Tools with `[options]`, a `.` in the name, or already declared in that config fail with mise's error and a hint: add them to the config yourself, run `mise lock` and `mise install`, or turn on *Install with `locked` off* in Settings (then only Install runs with `MISE_LOCKED=0` and mise writes the lockfile entries). `lockfile = true` alone does not create a lockfile: run `mise lock` once in a project. Update and Bump always run with your settings. |
+| `paranoid = true` / untrusted configs | A project config has to be trusted by hand (`mise trust`), and again each time its content changes outside mise. Until then the project shows nothing and the popout says `not trusted, run mise trust there`. The plugin never trusts a file on its own: the only exception is the locked-install flow above, which trusts a project config again after writing to it, only if it loaded right before and no longer does (that is, under `paranoid`). |
 | Tools missing from the lockfile | `mise outdated` skips them, so the list would say *up to date*. The popout says `tools missing from its lockfile, run mise lock` instead (`-g` for the global config). Happens after editing a `mise.toml` by hand or pulling a change to it. |
 | `minimum_release_age` | Applied by mise itself; the plugin passes no flag that overrides it. |
 | `disable_backends`, `enable_tools` | The registry list follows them. Live search and a typed `backend:tool` do not: installing a disabled one fails with mise's own message. |
