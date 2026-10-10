@@ -190,8 +190,8 @@ function describe(j) {
 
 // Search registry + accept any `backend:tool` (pipx:, npm:, cargo:, github:, ...)
 // since the registry is only a curated subset of what mise can install.
-// ctx: {registry, installed: [names that count as installed where it would go], tools: {name: version} there,
-//       remote, verified, unchecked, remoteSearch}
+// ctx: {registry: [{name, backend: "b:t b:t", desc}], installed: [names that count as installed where it would go],
+//       tools: {name: version} there, remote, verified, unchecked, remoteSearch}
 function search(query, ctx) {
     const raw = alias((query || "").trim());   // keep case: github:Owner/Repo, [opts] are case-sensitive
     const q = raw.toLowerCase();
@@ -211,6 +211,9 @@ function search(query, ctx) {
     const b = c > 0 ? base.substring(0, c) : "";
     const term = c > 0 ? base.substring(c + 1) : base;
     const reg = registry.find(r => r.name === base);
+    // registry entries that list the typed `backend:tool`: the same package as the direct row, which absorbs them
+    // (description, installed state) so each package shows once, not as `direct` plus one row per registry name
+    const samePkg = c > 0 ? registry.filter(r => r.backend.toLowerCase().split(" ").includes(base)) : [];
     // plain `backend:name` that a remote hit matches: fold the hit into the direct row (canonical
     // name, description) instead of listing the same package twice. crates.io treats - and _ alike.
     const norm = b === "cargo" ? x => x.replace(/_/g, "-") : (b === "pipx" || b === "pypi") ? x => x.replace(/[-_.]+/g, "-") : x => x;
@@ -223,29 +226,51 @@ function search(query, ctx) {
         // a hit proves the package exists, even when the exact-name check said 404 (npm and gem
         // names are case-sensitive: `npm:Playwright` is not found, `npm:playwright` is)
         const vf = verified[bare];
-        const v = exact ? {
-            ok: true,
-            desc: (vf && vf.ok && vf.desc) || exact.desc || ""
-        } : vf;
+        const regDesc = (samePkg.find(r => r.desc) || {}).desc || "";
+        let v = vf;
+        if (exact)
+            v = {
+                ok: true,
+                desc: (vf && vf.ok && vf.desc) || exact.desc || regDesc
+            };
+        else if (vf && vf.ok)
+            v = {
+                ok: true,
+                desc: vf.desc || regDesc
+            };
+        else if (!vf && samePkg.length)
+            v = {
+                ok: true,
+                desc: regDesc
+            };
         const name = exact ? exact.name : raw;
         const note = v ? (v.ok ? " · ✓" + (v.desc ? " " + v.desc : "") : " · ✗ not found") : bare in unchecked ? " · ? could not check" : "";
         out.push({
             name: name,
             backend: (isInstalled(bare) && bare !== raw ? "re-pin " + bare + " (now " + (tools[bare] || "?") + ")" : (v && v.ok ? "" : "direct · ") + (c > 0 ? raw.substring(0, c) : reg.backend)) + note,
-            installed: raw === bare && isInstalled(name),
+            installed: raw === bare && (isInstalled(name) || samePkg.some(r => isInstalled(r.name))),
             direct: true
         });
     }
-    const hits = registry.filter(r => r.name.includes(base) || r.backend.toLowerCase().includes(base));
+    const hits = registry.filter(r => !samePkg.includes(r) && (r.name.includes(base) || r.backend.toLowerCase().includes(base)));
     // exact > prefix > substring > backend-only match, then shortest name
     const score = r => r.name === base ? 0 : r.name.startsWith(base) ? 1 : r.name.includes(base) ? 2 : 3;
     hits.sort((a, b) => score(a) - score(b) || a.name.length - b.name.length);
-    hits.slice(0, maxRegistry).forEach(r => out.push({
-        name: r.name,
-        backend: r.backend,
-        installed: isInstalled(r.name),
-        direct: false
-    }));
+    // names with the same backends are one package (`rg`/`ripgrep`, `node`/`nodejs`): the best ranked shows,
+    // unless another is the one that is installed
+    const byPkg = new Map();   // keeps the position of the first one
+    for (const r of hits) {
+        const k = byPkg.get(r.backend);
+        if (!k || (!isInstalled(k.name) && isInstalled(r.name)))
+            byPkg.set(r.backend, r);
+    }
+    for (const r of Array.from(byPkg.values()).slice(0, maxRegistry))
+        out.push({
+            name: r.name,
+            backend: r.backend,
+            installed: isInstalled(r.name),
+            direct: false
+        });
     // remote hits for what is being typed: free text -> backends marked `free`, `backend:q` -> that one.
     // Older hits that still match stay visible while the next request is in flight.
     const cap = b ? maxPrefixed : maxFree;   // per backend
