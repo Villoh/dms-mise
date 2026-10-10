@@ -387,6 +387,20 @@ function parseGlobalLs(d) {
     };
 }
 
+// The bin of a version chip in a tool's details: "version" = remove just that version, "tool" = remove the tool from
+// the row's scope (what the bin of the row does), "" = no bin. `c`: have (installed), inUse (the active one in the
+// scope), removable (no tracked config uses it: mise's prunable list), sole (the only installed version), declared
+// (the row's scope declares the tool). A version nobody uses can go on its own. The active one cannot: the config
+// would ask for what is gone. Only when it is the tool's only version is it the tool itself, and then the bin does
+// what the row's bin does: `unuse`, and uninstall unless another config declares it.
+function versionBin(c) {
+    if (!c.have)
+        return "";
+    if (!c.inUse)
+        return c.removable ? "version" : "";
+    return c.sole && c.declared ? "tool" : "";
+}
+
 // `mise settings ls --all --json-extended` -> [{key, type, value, desc, set, section}]. Nested groups become
 // dotted keys (`npm.package_manager`); arrays show as `a,b`, the form `mise settings set` takes back. Only a
 // setting the user wrote in a config carries a `source`. Sections: "Configured" (those, first), then

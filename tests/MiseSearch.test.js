@@ -379,6 +379,26 @@ test("parseGlobalLs: the global lists what a config declares, not what is merely
         assert.deepEqual(S.parseGlobalLs(bad), { installed: [], missing: [], versions: {} });
 });
 
+test("versionBin: which bin a version chip gets and what it removes", () => {
+    const c = over => Object.assign({ have: true, inUse: false, removable: false, sole: false, declared: true }, over);
+    // a version nobody uses can go on its own
+    assert.equal(S.versionBin(c({ removable: true })), "version");
+    // one another project uses (not the active one of this scope) gets no bin: that was the bug
+    assert.equal(S.versionBin(c({ inUse: false, removable: false })), "");
+    // not installed: nothing to remove
+    assert.equal(S.versionBin(c({ have: false, removable: true })), "");
+    // the active one: no bin, the config asks for it...
+    assert.equal(S.versionBin(c({ inUse: true })), "");
+    assert.equal(S.versionBin(c({ inUse: true, sole: false, declared: true })), "");
+    // ...unless it is the tool's only version: then it is the tool, and the bin does what the row's bin does
+    assert.equal(S.versionBin(c({ inUse: true, sole: true, declared: true })), "tool");
+    // but not on a row whose scope does not declare it (the install row of a tool another project installed)
+    assert.equal(S.versionBin(c({ inUse: true, sole: true, declared: false })), "");
+    assert.equal(S.versionBin(c({ sole: true, declared: false })), "");
+    // a sole version nobody uses is just a version
+    assert.equal(S.versionBin(c({ sole: true, removable: true })), "version");
+});
+
 test("failure: why a request failed", () => {
     assert.equal(S.failure(200, "5", 0), "");
     assert.equal(S.failure(0, "", 28), "timeout");

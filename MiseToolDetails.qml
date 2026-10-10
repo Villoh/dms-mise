@@ -10,6 +10,8 @@ Column {
 
     required property string tool        // bare name
     property string scope: ""            // config the row belongs to ("" = global)
+    property string name: ""             // the row's tool name, as `unuse` takes it
+    property bool declared: false        // the scope of the row declares the tool
     property string fallback: ""         // shown when mise has no description yet
     property var info: ({})              // MiseInfo.info entry: meta / metaError / versions / versionsError
     property var chipVersions: []
@@ -99,6 +101,9 @@ Column {
                 have: ((details.info.meta || {}).installed_versions || []).includes(modelData)
                 inUse: ((details.info.meta || {}).active_versions || []).includes(modelData)
                 removable: details.unused.includes(modelData)
+                sole: ((details.info.meta || {}).installed_versions || []).length === 1
+                declared: details.declared
+                rowName: details.name
                 active: modelData === "latest" ? details.trackLatest : !details.trackLatest && inUse
             }
         }

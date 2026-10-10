@@ -178,6 +178,8 @@ Rectangle {
         anchors.rightMargin: Theme.spacingM
         tool: MiseService.bareName(modelData.name)
         scope: modelData.scope
+        name: modelData.name
+        declared: modelData.installed
         fallback: modelData.installed ? "" : modelData.sub
         info: row.info
         chipVersions: row.chipVersions
