@@ -54,22 +54,25 @@ test("uninstallUndeclared: uninstalls the tool, unless a tracked config still de
         fs.writeFileSync(f, text);
         fs.symlinkSync(f, path.join(tracked, name));
     };
-    const run = tool => {
+    const run = (tool, home) => {
         const log = path.join(dir, "log");
         fs.rmSync(log, { force: true });
-        const r = spawnSync("sh", ["-c", S.uninstallUndeclared, "sh", tool], { encoding: "utf8", env: Object.assign({}, process.env, { PATH: dir + ":" + process.env.PATH, LOG: log, MISE_STATE_DIR: path.join(dir, "state") }) });
+        const r = spawnSync("sh", ["-c", S.uninstallUndeclared, "sh", tool], { encoding: "utf8", env: Object.assign({}, process.env, { PATH: dir + ":" + process.env.PATH, LOG: log, MISE_STATE_DIR: path.join(dir, "state"), HOME: home || dir }) });
         // grep warns about an escape it does not need (`\/`), and that warning would end up in the job log
         assert.equal(r.stderr, "", tool);
-        return { status: r.status, log: fs.existsSync(log) ? fs.readFileSync(log, "utf8").trim() : "" };
+        return { status: r.status, log: fs.existsSync(log) ? fs.readFileSync(log, "utf8").trim() : "", out: r.stdout.trim() };
     };
     track("global", '[tools]\nnode = "22"\n"aqua:sharkdp/fd" = "latest"\n"npm:@scope/pkg.js" = { version = "1" }\n[tools.ruff]\nversion = "1"\n');
     track("gone", "");
     fs.rmSync(path.join(dir, "gone.toml"));   // a tracked config that no longer exists is skipped
     // nobody declares it: uninstalled, and no mise setting is handed over
-    assert.deepEqual(run("aqua:sharkdp/hyperfine"), { status: 0, log: "LOCKFILE=unset uninstall --yes --all aqua:sharkdp/hyperfine" });
-    // declared as a plain key, a quoted key, a quoted key with regex characters and a table: kept, mise not called
+    assert.deepEqual(run("aqua:sharkdp/hyperfine"), { status: 0, log: "LOCKFILE=unset uninstall --yes --all aqua:sharkdp/hyperfine", out: "" });
+    // declared as a plain key, a quoted key, a quoted key with regex characters and a table: kept, mise not called,
+    // and the script says which config keeps it (`~` for the home folder, that is what the toast shows)
     for (const t of ["node", "aqua:sharkdp/fd", "npm:@scope/pkg.js", "ruff"])
-        assert.deepEqual(run(t), { status: 0, log: "" }, t);
+        assert.deepEqual(run(t), { status: 0, log: "", out: "kept: ~/global.toml" }, t);
+    // outside the home folder the path stays whole
+    assert.equal(run("node", "/nonexistent").out, "kept: " + path.join(dir, "global.toml"));
     // a name that only contains a declared one, or differs by a regex character, is not declared
     assert.match(run("nod").log, /uninstall/);
     assert.match(run("aqua:sharkdp/f").log, /uninstall/);

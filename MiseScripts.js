@@ -60,12 +60,15 @@ var lockAfterUse = [
 // requirement, so the version would stay. Without touching any of the user's mise settings, do what the user
 // asked (remove it) with `mise uninstall`, after the check `prune` would have made: a tracked config (read as
 // text, so a project that is no longer trusted still counts) that declares the tool as a key (`name =`,
-// `"backend:name" =`, `[tools.name]`) keeps it. Nothing installed is not an error.
+// `"backend:name" =`, `[tools.name]`) keeps it, and the script says so (`kept: <that config>`, which the toast
+// shows) instead of staying silent. Nothing installed is not an error.
 var uninstallUndeclared = [
     'd="${MISE_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/mise}/tracked-configs"',
     'e=$(printf %s "$1" | sed \'s/[][\\.*^$(){}+?|]/\\\\&/g\')',
     'for f in "$d"/*; do [ -L "$f" ] || continue; p=$(readlink -f "$f") && [ -f "$p" ] || continue',
-    'grep -Eq "^[[:space:]]*(\\"$e\\"|$e)[[:space:]]*=|^[[:space:]]*\\[tools\\.(\\"$e\\"|$e)\\]" "$p" && exit 0',
+    'if grep -Eq "^[[:space:]]*(\\"$e\\"|$e)[[:space:]]*=|^[[:space:]]*\\[tools\\.(\\"$e\\"|$e)\\]" "$p"; then',
+    'o=$(readlink "$f"); case "$o" in "$HOME"/*) o="~${o#"$HOME"}";; esac; echo "kept: $o"; exit 0',
+    'fi',
     'done',
     'exec mise uninstall --yes --all "$1"'
 ].join("\n");
