@@ -190,8 +190,8 @@ function describe(j) {
 
 // Search registry + accept any `backend:tool` (pipx:, npm:, cargo:, github:, ...)
 // since the registry is only a curated subset of what mise can install.
-// ctx: {registry, installed: [names that count as installed where it would go], tools: {name: version} there,
-//       remote, verified, unchecked, remoteSearch}
+// ctx: {registry: [{name, backend: "b:t b:t", desc}], installed: [names that count as installed where it would go],
+//       tools: {name: version} there, remote, verified, unchecked, remoteSearch}
 function search(query, ctx) {
     const raw = alias((query || "").trim());   // keep case: github:Owner/Repo, [opts] are case-sensitive
     const q = raw.toLowerCase();
@@ -211,9 +211,23 @@ function search(query, ctx) {
     const b = c > 0 ? base.substring(0, c) : "";
     const term = c > 0 ? base.substring(c + 1) : base;
     const reg = registry.find(r => r.name === base);
+    // registry entries that list the typed `backend:tool`: the same package as the direct row, which absorbs them
+    // (description, installed state) so each package shows once, not as `direct` plus one row per registry name
+    // `aqua:ripgrep` has no owner: mise looks the name up in its registry and takes the entry's first aqua backend
+    // (`aqua:BurntSushi/ripgrep`), so that is the package the row stands for
+    let pkgKey = base;
+    if (b === "aqua" && !term.includes("/")) {
+        const e = registry.find(r => r.name === term);
+        pkgKey = ((e ? e.backend.split(" ") : []).find(t => t.startsWith("aqua:")) || base).toLowerCase();
+    }
+    const samePkg = c > 0 ? registry.filter(r => r.backend.toLowerCase().split(" ").includes(pkgKey)) : [];
     // plain `backend:name` that a remote hit matches: fold the hit into the direct row (canonical
     // name, description) instead of listing the same package twice. crates.io treats - and _ alike.
-    const norm = b === "cargo" ? x => x.replace(/_/g, "-") : (b === "pipx" || b === "pypi") ? x => x.replace(/[-_.]+/g, "-") : x => x;
+    let norm = x => x;
+    if (b === "cargo")
+        norm = x => x.replace(/_/g, "-");
+    else if (b === "pipx" || b === "pypi")
+        norm = x => x.replace(/[-_.]+/g, "-");
     const same = (x, y) => norm(x) === norm(y);
     const exact = ctx.remoteSearch && b && raw === bare ? remote.find(r => r.backend === b && same(r.name.toLowerCase(), base)) : null;
     // `backend:tool`, `backend:tool@ver`, `backend:tool[opt=val]` or `registryname@ver`
@@ -223,40 +237,120 @@ function search(query, ctx) {
         // a hit proves the package exists, even when the exact-name check said 404 (npm and gem
         // names are case-sensitive: `npm:Playwright` is not found, `npm:playwright` is)
         const vf = verified[bare];
-        const v = exact ? {
-            ok: true,
-            desc: (vf && vf.ok && vf.desc) || exact.desc || ""
-        } : vf;
+        const regDesc = (samePkg.find(r => r.desc) || {}).desc || "";
+        let v = vf;
+        if (exact)
+            v = {
+                ok: true,
+                desc: (vf && vf.ok && vf.desc) || exact.desc || regDesc
+            };
+        else if (vf && vf.ok)
+            v = {
+                ok: true,
+                desc: vf.desc || regDesc
+            };
+        else if (!vf && samePkg.length)
+            v = {
+                ok: true,
+                desc: regDesc
+            };
         const name = exact ? exact.name : raw;
-        const note = v ? (v.ok ? " · ✓" + (v.desc ? " " + v.desc : "") : " · ✗ not found") : bare in unchecked ? " · ? could not check" : "";
+        let note = "";
+        if (v) {
+            const d = v.desc ? ` ${v.desc}` : "";
+            note = v.ok ? ` · ✓${d}` : " · ✗ not found";
+        } else if (bare in unchecked)
+            note = " · ? could not check";
+        let kind = `${v && v.ok ? "" : "direct · "}${c > 0 ? raw.substring(0, c) : reg.backend}`;
+        if (isInstalled(bare) && bare !== raw)
+            kind = `re-pin ${bare} (now ${tools[bare] || "?"})`;
         out.push({
             name: name,
-            backend: (isInstalled(bare) && bare !== raw ? "re-pin " + bare + " (now " + (tools[bare] || "?") + ")" : (v && v.ok ? "" : "direct · ") + (c > 0 ? raw.substring(0, c) : reg.backend)) + note,
-            installed: raw === bare && isInstalled(name),
+            backend: kind + note,
+            installed: raw === bare && (isInstalled(name) || samePkg.some(r => isInstalled(r.name))),
             direct: true
         });
     }
-    const hits = registry.filter(r => r.name.includes(base) || r.backend.toLowerCase().includes(base));
+    // `backend:term`: the registry lists `aqua:BurntSushi/ripgrep`, which does not contain `aqua:ripg`. Look for the term
+    // after the prefix, as the remote search does: one row per `backend:...` entry, named as mise takes it
+    const tokens = new Map();
+    if (c > 0)
+        for (const r of registry)
+            for (const t of r.backend.split(" ")) {
+                const rest = t.substring(b.length + 1).toLowerCase();
+                if (!t.toLowerCase().startsWith(`${b}:`) || !rest.includes(term) || t.toLowerCase() === pkgKey || t.toLowerCase() === base)
+                    continue;
+                const e = tokens.get(t) || {
+                    name: t,
+                    rest: rest,
+                    desc: "",
+                    installed: false
+                };
+                e.desc = e.desc || r.desc || "";
+                e.installed = e.installed || isInstalled(r.name) || isInstalled(t);
+                tokens.set(t, e);
+            }
+    const tail = e => e.rest.split("/").pop();
+    const tokenScore = e => {
+        const t = tail(e);
+        if (t === term)
+            return 0;
+        if (t.startsWith(term))
+            return 1;
+        return t.includes(term) ? 2 : 3;
+    };
+    for (const e of Array.from(tokens.values()).sort((x, y) => tokenScore(x) - tokenScore(y) || x.rest.length - y.rest.length).slice(0, maxRegistry))
+        out.push({
+            name: e.name,
+            backend: e.desc ? `${b} · ${e.desc}` : b,
+            installed: e.installed,
+            direct: false
+        });
+    const hits = c > 0 ? [] : registry.filter(r => r.name.includes(base) || r.backend.toLowerCase().includes(base));
     // exact > prefix > substring > backend-only match, then shortest name
-    const score = r => r.name === base ? 0 : r.name.startsWith(base) ? 1 : r.name.includes(base) ? 2 : 3;
+    const score = r => {
+        if (r.name === base)
+            return 0;
+        if (r.name.startsWith(base))
+            return 1;
+        return r.name.includes(base) ? 2 : 3;
+    };
     hits.sort((a, b) => score(a) - score(b) || a.name.length - b.name.length);
-    hits.slice(0, maxRegistry).forEach(r => out.push({
-        name: r.name,
-        backend: r.backend,
-        installed: isInstalled(r.name),
-        direct: false
-    }));
+    // names with the same backends are one package (`rg`/`ripgrep`, `node`/`nodejs`). Shown: the installed one,
+    // else the one typed, else the real name (the tool part of a backend: `ripgrep`, not its alias `rg`)
+    const canon = r => r.backend.toLowerCase().split(" ").some(t => t.split(/[:/]/).pop() === r.name);
+    const pref = r => (isInstalled(r.name) ? 4 : 0) + (r.name === base ? 2 : 0) + (canon(r) ? 1 : 0);
+    const byPkg = new Map();   // keeps the position of the first one
+    for (const r of hits) {
+        const k = byPkg.get(r.backend);
+        if (!k || pref(r) > pref(k))
+            byPkg.set(r.backend, r);
+    }
+    for (const r of Array.from(byPkg.values()).slice(0, maxRegistry))
+        out.push({
+            name: r.name,
+            backend: r.backend,
+            installed: isInstalled(r.name),
+            direct: false
+        });
     // remote hits for what is being typed: free text -> backends marked `free`, `backend:q` -> that one.
     // Older hits that still match stay visible while the next request is in flight.
     const cap = b ? maxPrefixed : maxFree;   // per backend
     const seen = {};
     if (ctx.remoteSearch && term)
-        remote.filter(r => (b ? r.backend === b : searchers[r.backend].free) && r.name.toLowerCase().includes(term) && r.name !== raw && !out.some(o => o.name === r.name) && (seen[r.backend] = (seen[r.backend] || 0) + 1) <= cap).forEach(r => out.push({
-            name: r.name,
-            backend: r.backend + " · " + r.desc,
-            installed: isInstalled(r.name),
-            direct: false
-        }));
+        for (const r of remote) {
+            if (!(b ? r.backend === b : searchers[r.backend].free) || !r.name.toLowerCase().includes(term) || r.name === raw || out.some(o => o.name === r.name))
+                continue;
+            seen[r.backend] = (seen[r.backend] || 0) + 1;
+            if (seen[r.backend] > cap)
+                continue;
+            out.push({
+                name: r.name,
+                backend: `${r.backend} · ${r.desc}`,
+                installed: isInstalled(r.name),
+                direct: false
+            });
+        }
     return out;
 }
 
@@ -266,24 +360,35 @@ function search(query, ctx) {
 // "General" (no group) and one per group (`npm`, `github`...), alphabetical.
 function parseSettings(json) {
     const out = [];
-    const walk = (prefix, o) => Object.keys(o).forEach(k => {
-        const v = o[k];
-        if (!v || typeof v !== "object")
-            return;
-        if ("type" in v && "description" in v)
-            out.push({
-                key: prefix + k,
-                type: v.type,
-                value: Array.isArray(v.value) ? v.value.join(",") : String(v.value ?? ""),
-                desc: v.description || "",
-                set: !!v.source,
-                section: v.source ? "Configured" : prefix ? prefix.slice(0, -1) : "General"
-            });
-        else
-            walk(prefix + k + ".", v);
-    });
+    const walk = (prefix, o) => {
+        for (const k of Object.keys(o)) {
+            const v = o[k];
+            if (!v || typeof v !== "object")
+                continue;
+            if ("type" in v && "description" in v) {
+                let section = "General";
+                if (v.source)
+                    section = "Configured";
+                else if (prefix)
+                    section = prefix.slice(0, -1);
+                out.push({
+                    key: `${prefix}${k}`,
+                    type: v.type,
+                    value: Array.isArray(v.value) ? v.value.join(",") : String(v.value ?? ""),
+                    desc: v.description || "",
+                    set: Boolean(v.source),
+                    section: section
+                });
+            } else
+                walk(`${prefix}${k}.`, v);
+        }
+    };
     walk("", json);
-    const rank = s => (s === "Configured" ? 0 : s === "General" ? 1 : 2);
+    const rank = s => {
+        if (s === "Configured")
+            return 0;
+        return s === "General" ? 1 : 2;
+    };
     return out.sort((a, b) => rank(a.section) - rank(b.section) || a.section.localeCompare(b.section) || a.key.localeCompare(b.key));
 }
 

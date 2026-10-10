@@ -8,7 +8,7 @@ const S = load("MiseSearch.js");
 const registry = [
     { name: "node", backend: "core:node" },
     { name: "nodejs", backend: "core:node" },
-    { name: "ripgrep", backend: "aqua:BurntSushi/ripgrep cargo:ripgrep ubi:BurntSushi/ripgrep" },
+    { name: "ripgrep", backend: "aqua:BurntSushi/ripgrep cargo:ripgrep ubi:BurntSushi/ripgrep", desc: "recursive grep" },
     { name: "ripgrep-all", backend: "cargo:ripgrep_all" },
     { name: "fd", backend: "aqua:sharkdp/fd cargo:fd-find" },
     { name: "jq", backend: "aqua:jqlang/jq" }
@@ -61,14 +61,73 @@ test("search: npm:@scope/pkg keeps its @", () => {
 
 test("search: ranking exact > prefix > substring, then shortest; capped at 12", () => {
     const rows = S.search("node", ctx()).filter(r => !r.direct);
-    assert.deepEqual(rows.slice(0, 2).map(r => r.name), ["node", "nodejs"]);
+    assert.deepEqual(rows.slice(0, 2).map(r => r.name), ["node"], "nodejs lists the same backends: one package");
     assert.equal(rows[0].installed, true);
-    assert.equal(rows[1].installed, false);
     const rip = S.search("rip", ctx()).filter(r => !r.direct);
     assert.equal(rip.length, S.maxRegistry);
     assert.equal(rip[0].name, "rip0", "shortest prefix match first");
     // backend text matches too (a `cargo:` search finds registry tools installed through cargo)
     assert.ok(S.search("fd-find", ctx()).some(r => r.name === "fd"));
+});
+
+test("search: registry names of one package are one row; the installed one wins", () => {
+    assert.deepEqual(S.search("nod", ctx({ installed: [] })).map(r => r.name), ["node"]);
+    const rows = S.search("nod", ctx({ installed: ["nodejs"] }));
+    assert.deepEqual(rows.map(r => r.name), ["nodejs"]);
+    assert.equal(rows[0].installed, true);
+});
+
+test("search: of one package, the real name shows rather than the alias, unless the alias is typed", () => {
+    const reg = [{ name: "rg", backend: "aqua:BurntSushi/ripgrep cargo:ripgrep" }, { name: "ripgrep", backend: "aqua:BurntSushi/ripgrep cargo:ripgrep" }];
+    const names = (q, over) => S.search(q, ctx(Object.assign({ registry: reg, installed: [] }, over))).map(r => r.name);
+    assert.deepEqual(names("ripgre"), ["ripgrep"], "rg is shorter, ripgrep is the name");
+    assert.deepEqual(names("rg"), ["rg"], "what was typed");
+    assert.deepEqual(names("ripgre", { installed: ["rg"] }), ["rg"], "what is installed");
+});
+
+test("search: backend:term finds registry entries whatever the owner in between", () => {
+    // the registry lists `aqua:BurntSushi/ripgrep`: it does not contain `aqua:ripg`
+    const rows = S.search("aqua:ripg", ctx({ installed: [] }));
+    assert.deepEqual(rows.map(r => r.name), ["aqua:ripg", "aqua:BurntSushi/ripgrep"]);
+    assert.equal(rows[1].backend, "aqua · recursive grep");
+    assert.equal(rows[1].direct, false);
+    // the owner is searched too; other backends' entries are not listed
+    assert.deepEqual(S.search("aqua:burnt", ctx()).map(r => r.name), ["aqua:burnt", "aqua:BurntSushi/ripgrep"]);
+    assert.ok(S.search("aqua:ripg", ctx()).every(r => !r.name.startsWith("cargo:")));
+    // the one that is installed through its registry name counts as installed
+    assert.equal(S.search("aqua:ripg", ctx())[1].installed, true);
+    // nothing matches: only the direct row
+    assert.deepEqual(S.search("aqua:zzzz", ctx()).map(r => r.name), ["aqua:zzzz"]);
+});
+
+test("search: aqua:name without owner stands for the aqua backend of the registry entry, as in mise", () => {
+    const rows = S.search("aqua:ripgrep", ctx({ installed: [] }));
+    assert.equal(rows[0].name, "aqua:ripgrep", "installs what was typed");
+    assert.equal(rows[0].backend, "aqua · ✓ recursive grep");
+    assert.ok(!rows.some(r => r.name === "aqua:BurntSushi/ripgrep"), "it is the same package");
+    assert.equal(S.search("aqua:ripgrep", ctx())[0].installed, true, "ripgrep is installed");
+    // not in the registry: no description, like any unknown name
+    assert.equal(S.search("aqua:nope", ctx())[0].backend, "direct · aqua");
+    // only aqua does this: `cargo:ripgrep` is a crate name, not a registry lookup
+    assert.equal(S.search("cargo:jq", ctx())[0].backend, "direct · cargo");
+});
+
+test("search: typed backend:tool listed in the registry folds its entries into the direct row", () => {
+    // one row, with the description; `ripgrep` is installed, so is the package
+    const rows = S.search("aqua:BurntSushi/ripgrep", ctx());
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].backend, "aqua · ✓ recursive grep");
+    assert.equal(rows[0].direct, true);
+    assert.equal(rows[0].name, "aqua:BurntSushi/ripgrep", "installs what was typed");
+    assert.equal(rows[0].installed, true);
+    assert.equal(S.search("cargo:ripgrep", ctx({ installed: [] }))[0].installed, false);
+    // not in the registry: as before
+    assert.equal(S.search("aqua:foo/bar", ctx())[0].backend, "direct · aqua");
+    // the check of the site wins over the registry
+    assert.equal(S.search("cargo:ripgrep", ctx({ verified: { "cargo:ripgrep": { ok: false } } }))[0].backend, "direct · cargo · ✗ not found");
+    assert.equal(S.search("cargo:ripgrep", ctx({ verified: { "cargo:ripgrep": { ok: true, desc: "from crates.io" } } }))[0].backend, "cargo · ✓ from crates.io");
+    // another package that merely contains the name is listed too, under the backend typed
+    assert.deepEqual(S.search("cargo:ripgrep", ctx()).map(r => r.name), ["cargo:ripgrep", "cargo:ripgrep_all"]);
 });
 
 test("search: registryname@ver is a direct re-pin row for an installed tool", () => {

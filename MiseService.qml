@@ -18,7 +18,7 @@ Item {
     property var versions: ({})  // name -> active version
     property var prunable: ({})  // name -> [versions] no tracked config uses (`mise ls --prunable`)
     readonly property int prunableCount: Object.keys(prunable).reduce((n, k) => n + prunable[k].length, 0)
-    property var registry: []    // [{name, backend}] ~1000 curated entries
+    property var registry: []    // [{name, backend, desc}] ~1000 curated entries
     property bool checking: false
     property string error: ""
     property double lastCheck: 0
@@ -359,15 +359,17 @@ Item {
 
     Process {
         id: regProc
-        command: ["mise", "registry"]
+        command: ["mise", "registry", "--json"]
         stdout: StdioCollector {
-            onStreamFinished: root.registry = text.split("\n").filter(l => l.trim()).map(l => {
-                const p = l.trim().split(/\s+/);
-                return {
-                    name: p[0],
-                    backend: p.slice(1).join(" ")
-                };
-            })
+            onStreamFinished: {
+                try {
+                    root.registry = JSON.parse(text).map(r => ({
+                                name: r.short,
+                                backend: r.backends.join(" "),
+                                desc: r.description || ""
+                            }));
+                } catch (e) {}
+            }
         }
     }
 }
