@@ -247,9 +247,12 @@ Item {
         return Search.bareName(n);
     }
 
-    // removes from that config and prunes the installed version
+    // removes from that config and from the machine. `unuse` leaves the tool's entries in mise.lock and `prune`
+    // counts a lockfile as a requirement, so the version would stay installed: uninstall it too, unless another
+    // tracked config declares the tool (Scripts.uninstallUndeclared). No mise setting is touched.
     function uninstall(tool, scope) {
-        MiseJobs.run(scope ? ["unuse", "--path", scope, "--yes", tool] : ["unuse", "--global", "--yes", tool], "Removing " + tool + inLabel(scope), "Removed " + tool + inLabel(scope));
+        const unuse = scope ? ["unuse", "--path", scope, "--yes", tool] : ["unuse", "--global", "--yes", tool];
+        MiseJobs.runMany([unuse, ["sh", "-c", Scripts.uninstallUndeclared, "sh", tool]], "Removing " + tool + inLabel(scope), "Removed " + tool + inLabel(scope));
     }
 
     // removes that one installed version; the config is not touched
