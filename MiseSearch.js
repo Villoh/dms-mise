@@ -131,8 +131,7 @@ var verifiers = {
     dotnet: t => "https://api.nuget.org/v3-flatcontainer/" + encodeURIComponent(t.toLowerCase()) + "/index.json",
     // module path: capitals are escaped as !lower in the proxy protocol
     go: t => "https://proxy.golang.org/" + t.replace(/[A-Z]/g, c => "!" + c.toLowerCase()) + "/@latest",
-    // the aqua registry is a folder per owner/repo
-    aqua: t => /^[^/]+\/[^/]+/.test(t) ? "https://raw.githubusercontent.com/aquaproj/aqua-registry/main/pkgs/" + t + "/registry.yaml" : "",
+    // no aqua: mise resolves its names with a registry embedded in its binary, which is not upstream's (see miseCheck)
     github: t => /^[^/]+\/[^/]+$/.test(t) ? "https://api.github.com/repos/" + t : "",
     ubi: t => /^[^/]+\/[^/]+$/.test(t) ? "https://api.github.com/repos/" + t : "",
     spm: t => /^[^/]+\/[^/]+$/.test(t) ? "https://api.github.com/repos/" + t : "",
@@ -146,6 +145,22 @@ function verifyUrl(q) {
     if (!p.t || !verifiers[p.b] || /:\/\/|^git\+/.test(p.t))
         return "";
     return verifiers[p.b](p.t);
+}
+
+// `backend:tool` that only mise can check, because it resolves the name itself: `aqua:jq`, `aqua:owner/repo`.
+// Returns what to hand to `mise tool --json`, "" when it is not one.
+function miseCheck(q) {
+    const p = splitQuery(q);
+    return p.b === "aqua" && p.t && !/:\/\/|^git\+/.test(p.t) ? p.bare : "";
+}
+
+// the answer of `mise tool --json` as an HTTP-like status (what gotVerify takes): 200 mise knows the name,
+// 404 it does not, 0 no usable answer. A name it knows has a description or the checks it would run
+// (`security`); an unknown one has neither.
+function toolStatus(j) {
+    if (!j || typeof j !== "object")
+        return 0;
+    return j.description || (Array.isArray(j.security) && j.security.length) ? 200 : 404;
 }
 
 // backends that get a search request for this query
@@ -167,13 +182,13 @@ function failure(status, remaining, code) {
         return code === 28 ? "timeout" : "offline";
     if (status === 429 || (status === 403 && remaining === "0"))
         return "rate limited";
-    return "HTTP " + status;
+    return `HTTP ${status}`;
 }
 
 // the answer of a search request as rows: [{name: "npm:foo", backend: "npm", desc}]
 function parseHits(b, json, term) {
     return searchers[b].parse(json, term).slice(0, maxPrefixed).map(h => ({
-        name: b + ":" + h.name,
+        name: `${b}:${h.name}`,
         backend: b,
         desc: h.desc || ""
     }));
