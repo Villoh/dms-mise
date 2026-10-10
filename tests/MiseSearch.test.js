@@ -77,6 +77,14 @@ test("search: registry names of one package are one row; the installed one wins"
     assert.equal(rows[0].installed, true);
 });
 
+test("search: of one package, the real name shows rather than the alias, unless the alias is typed", () => {
+    const reg = [{ name: "rg", backend: "aqua:BurntSushi/ripgrep cargo:ripgrep" }, { name: "ripgrep", backend: "aqua:BurntSushi/ripgrep cargo:ripgrep" }];
+    const names = (q, over) => S.search(q, ctx(Object.assign({ registry: reg, installed: [] }, over))).map(r => r.name);
+    assert.deepEqual(names("ripgre"), ["ripgrep"], "rg is shorter, ripgrep is the name");
+    assert.deepEqual(names("rg"), ["rg"], "what was typed");
+    assert.deepEqual(names("ripgre", { installed: ["rg"] }), ["rg"], "what is installed");
+});
+
 test("search: typed backend:tool listed in the registry folds its entries into the direct row", () => {
     // one row, with the description; `ripgrep` is installed, so is the package
     const rows = S.search("aqua:BurntSushi/ripgrep", ctx());

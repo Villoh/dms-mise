@@ -256,12 +256,14 @@ function search(query, ctx) {
     // exact > prefix > substring > backend-only match, then shortest name
     const score = r => r.name === base ? 0 : r.name.startsWith(base) ? 1 : r.name.includes(base) ? 2 : 3;
     hits.sort((a, b) => score(a) - score(b) || a.name.length - b.name.length);
-    // names with the same backends are one package (`rg`/`ripgrep`, `node`/`nodejs`): the best ranked shows,
-    // unless another is the one that is installed
+    // names with the same backends are one package (`rg`/`ripgrep`, `node`/`nodejs`). Shown: the installed one,
+    // else the one typed, else the real name (the tool part of a backend: `ripgrep`, not its alias `rg`)
+    const canon = r => r.backend.toLowerCase().split(" ").some(t => t.split(/[:/]/).pop() === r.name);
+    const pref = r => (isInstalled(r.name) ? 4 : 0) + (r.name === base ? 2 : 0) + (canon(r) ? 1 : 0);
     const byPkg = new Map();   // keeps the position of the first one
     for (const r of hits) {
         const k = byPkg.get(r.backend);
-        if (!k || (!isInstalled(k.name) && isInstalled(r.name)))
+        if (!k || pref(r) > pref(k))
             byPkg.set(r.backend, r);
     }
     for (const r of Array.from(byPkg.values()).slice(0, maxRegistry))
