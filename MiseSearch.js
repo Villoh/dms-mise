@@ -223,7 +223,11 @@ function search(query, ctx) {
     const samePkg = c > 0 ? registry.filter(r => r.backend.toLowerCase().split(" ").includes(pkgKey)) : [];
     // plain `backend:name` that a remote hit matches: fold the hit into the direct row (canonical
     // name, description) instead of listing the same package twice. crates.io treats - and _ alike.
-    const norm = b === "cargo" ? x => x.replace(/_/g, "-") : (b === "pipx" || b === "pypi") ? x => x.replace(/[-_.]+/g, "-") : x => x;
+    let norm = x => x;
+    if (b === "cargo")
+        norm = x => x.replace(/_/g, "-");
+    else if (b === "pipx" || b === "pypi")
+        norm = x => x.replace(/[-_.]+/g, "-");
     const same = (x, y) => norm(x) === norm(y);
     const exact = ctx.remoteSearch && b && raw === bare ? remote.find(r => r.backend === b && same(r.name.toLowerCase(), base)) : null;
     // `backend:tool`, `backend:tool@ver`, `backend:tool[opt=val]` or `registryname@ver`
@@ -251,10 +255,18 @@ function search(query, ctx) {
                 desc: regDesc
             };
         const name = exact ? exact.name : raw;
-        const note = v ? (v.ok ? " · ✓" + (v.desc ? " " + v.desc : "") : " · ✗ not found") : bare in unchecked ? " · ? could not check" : "";
+        let note = "";
+        if (v) {
+            const d = v.desc ? ` ${v.desc}` : "";
+            note = v.ok ? ` · ✓${d}` : " · ✗ not found";
+        } else if (bare in unchecked)
+            note = " · ? could not check";
+        let kind = `${v && v.ok ? "" : "direct · "}${c > 0 ? raw.substring(0, c) : reg.backend}`;
+        if (isInstalled(bare) && bare !== raw)
+            kind = `re-pin ${bare} (now ${tools[bare] || "?"})`;
         out.push({
             name: name,
-            backend: (isInstalled(bare) && bare !== raw ? "re-pin " + bare + " (now " + (tools[bare] || "?") + ")" : (v && v.ok ? "" : "direct · ") + (c > 0 ? raw.substring(0, c) : reg.backend)) + note,
+            backend: kind + note,
             installed: raw === bare && (isInstalled(name) || samePkg.some(r => isInstalled(r.name))),
             direct: true
         });
