@@ -54,6 +54,7 @@ Rectangle {
         anchors.right: parent.right
         anchors.rightMargin: Theme.spacingXS
         anchors.verticalCenter: parent.verticalCenter
+        spacing: Theme.spacingS
         DankTextField {
             visible: !cfg.isBool
             anchors.verticalCenter: parent.verticalCenter
