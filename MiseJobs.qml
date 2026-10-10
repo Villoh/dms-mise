@@ -51,7 +51,7 @@ Item {
     }
 
     function pushLog(line) {
-        const t = line.trim();
+        const t = line.replace(/\u001b\[[0-9;]*m/g, "").trim();   // mise colours its errors even into a pipe
         if (t && !t.startsWith("DEBUG"))   // MISE_VERBOSE noise
             log = log.concat([t]).slice(-40);
     }
