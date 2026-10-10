@@ -66,6 +66,31 @@ test("lockStale: `mise lock` only when mise says something is stale, for the sco
     fs.rmSync(dir, { recursive: true });
 });
 
+test("locked: `latest` is locked with --bump, a version is not", () => {
+    const fs = require("node:fs");
+    const os = require("node:os");
+    const path = require("node:path");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mise-"));
+    // a fake mise: logs its arguments (`config get` answers nothing, so the tool has no options)
+    fs.writeFileSync(path.join(dir, "mise"), '#!/bin/sh\necho "$@" >> "$LOG"\n', { mode: 0o755 });
+    const run = (cfg, prj, version) => {
+        const log = path.join(dir, "log");
+        fs.rmSync(log, { force: true });
+        const r = spawnSync("sh", ["-c", S.locked, "sh", cfg, prj, "aqua:sharkdp/bat", version], { encoding: "utf8", env: Object.assign({}, process.env, { PATH: dir + ":" + process.env.PATH, LOG: log, MISE_GLOBAL_CONFIG_FILE: path.join(dir, "global.toml") }) });
+        const calls = fs.readFileSync(log, "utf8").trim().split("\n");
+        return { status: r.status, lock: calls.find(c => /(^| )lock( |$)/.test(c)) };
+    };
+    // global: `lock -g`, with --bump for latest only
+    assert.deepEqual(run("", "", "latest"), { status: 0, lock: "lock -g --bump aqua:sharkdp/bat" });
+    assert.deepEqual(run("", "", "0.26.0"), { status: 0, lock: "lock -g aqua:sharkdp/bat" });
+    // a project: in its folder
+    assert.deepEqual(run("/p/mise.toml", "/p", "latest"), { status: 0, lock: "-C /p lock --bump aqua:sharkdp/bat" });
+    assert.deepEqual(run("/p/mise.toml", "/p", "0.26.0"), { status: 0, lock: "-C /p lock aqua:sharkdp/bat" });
+    // a version that merely starts with `latest` is a version
+    assert.equal(run("", "", "latest-1").lock, "lock -g aqua:sharkdp/bat");
+    fs.rmSync(dir, { recursive: true });
+});
+
 test("fix: one failing config does not stop the others, and the job fails at the end", () => {
     const fs = require("node:fs");
     const os = require("node:os");
