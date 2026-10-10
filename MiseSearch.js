@@ -369,6 +369,24 @@ function search(query, ctx) {
     return out;
 }
 
+// `mise ls --json` run outside any project -> what the GLOBAL scope has: {installed: [names], missing: [names], versions: {name: active}}.
+// Only a tool that a config declares counts (some entry has a `source`). `mise ls` also lists what is installed but
+// declared nowhere, or only by a project: those have no `source` and are not the global's, so the global must not
+// show them (it would offer to remove what other projects use). The projects filter the same way (`source.path`).
+// `missing` = declared and not installed.
+function parseGlobalLs(d) {
+    const keys = Object.keys(d || {}).filter(k => Array.isArray(d[k]) && d[k].some(x => x.source));
+    const has = k => d[k].some(x => x.installed);
+    const versions = {};
+    for (const k of keys)
+        versions[k] = (d[k].find(x => x.active) || d[k][0] || {}).version || "";
+    return {
+        installed: keys.filter(has),
+        missing: keys.filter(k => !has(k)),
+        versions: versions
+    };
+}
+
 // `mise settings ls --all --json-extended` -> [{key, type, value, desc, set, section}]. Nested groups become
 // dotted keys (`npm.package_manager`); arrays show as `a,b`, the form `mise settings set` takes back. Only a
 // setting the user wrote in a config carries a `source`. Sections: "Configured" (those, first), then
