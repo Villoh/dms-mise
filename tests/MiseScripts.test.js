@@ -5,7 +5,7 @@ const { spawnSync } = require("node:child_process");
 const { load } = require("./load");
 
 const S = load("MiseScripts.js");
-const scripts = ["project", "tracked", "resolve", "fix", "lockAfterUse", "locked", "uninstallUndeclared"];
+const scripts = ["project", "tracked", "resolve", "fix", "lockAfterUse", "lockStale", "locked"];
 
 test("every script is a non-empty string", () => {
     for (const k of scripts)
@@ -40,46 +40,29 @@ test("resolve: file, folder, ~ and errors (no mise needed)", () => {
     fs.rmSync(dir, { recursive: true });
 });
 
-test("uninstallUndeclared: uninstalls the tool, unless a tracked config still declares it", () => {
+test("lockStale: `mise lock` only when mise says something is stale, for the scope that was edited", () => {
     const fs = require("node:fs");
     const os = require("node:os");
     const path = require("node:path");
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mise-"));
-    // a fake mise: logs its arguments and whether it was handed a lockfile setting
-    fs.writeFileSync(path.join(dir, "mise"), '#!/bin/sh\necho "LOCKFILE=${MISE_LOCKFILE-unset} $@" >> "$LOG"\n', { mode: 0o755 });
-    const tracked = path.join(dir, "state", "tracked-configs");
-    fs.mkdirSync(tracked, { recursive: true });
-    const track = (name, text) => {
-        const f = path.join(dir, name + ".toml");
-        fs.writeFileSync(f, text);
-        fs.symlinkSync(f, path.join(tracked, name));
-    };
-    const run = (tool, home) => {
+    // a fake mise: logs its arguments; `--dry-run` answers what DRY says
+    fs.writeFileSync(path.join(dir, "mise"), '#!/bin/sh\necho "$@" >> "$LOG"\ncase "$*" in *--dry-run*) [ -n "$DRY" ] && echo "$DRY";; esac\n', { mode: 0o755 });
+    const run = (arg, dry) => {
         const log = path.join(dir, "log");
         fs.rmSync(log, { force: true });
-        const r = spawnSync("sh", ["-c", S.uninstallUndeclared, "sh", tool], { encoding: "utf8", env: Object.assign({}, process.env, { PATH: dir + ":" + process.env.PATH, LOG: log, MISE_STATE_DIR: path.join(dir, "state"), HOME: home || dir }) });
-        // grep warns about an escape it does not need (`\/`), and that warning would end up in the job log
-        assert.equal(r.stderr, "", tool);
-        return { status: r.status, log: fs.existsSync(log) ? fs.readFileSync(log, "utf8").trim() : "", out: r.stdout.trim() };
+        const r = spawnSync("sh", ["-c", S.lockStale, "sh", arg], { encoding: "utf8", env: Object.assign({}, process.env, { PATH: dir + ":" + process.env.PATH, LOG: log }, dry ? { DRY: dry } : {}) });
+        return { status: r.status, calls: fs.existsSync(log) ? fs.readFileSync(log, "utf8").trim().split("\n") : [] };
     };
-    track("global", '[tools]\nnode = "22"\n"aqua:sharkdp/fd" = "latest"\n"npm:@scope/pkg.js" = { version = "1" }\n[tools.ruff]\nversion = "1"\n');
-    track("gone", "");
-    fs.rmSync(path.join(dir, "gone.toml"));   // a tracked config that no longer exists is skipped
-    // nobody declares it: uninstalled, and no mise setting is handed over
-    assert.deepEqual(run("aqua:sharkdp/hyperfine"), { status: 0, log: "LOCKFILE=unset uninstall --yes --all aqua:sharkdp/hyperfine", out: "" });
-    // declared as a plain key, a quoted key, a quoted key with regex characters and a table: kept, mise not called,
-    // and the script says which config keeps it (`~` for the home folder, that is what the toast shows)
-    for (const t of ["node", "aqua:sharkdp/fd", "npm:@scope/pkg.js", "ruff"])
-        assert.deepEqual(run(t), { status: 0, log: "", out: "kept: ~/global.toml" }, t);
-    // outside the home folder the path stays whole
-    assert.equal(run("node", "/nonexistent").out, "kept: " + path.join(dir, "global.toml"));
-    // a name that only contains a declared one, or differs by a regex character, is not declared
-    assert.match(run("nod").log, /uninstall/);
-    assert.match(run("aqua:sharkdp/f").log, /uninstall/);
-    assert.match(run("npm:@scope/pkgXjs").log, /uninstall/, "the dot is not a wildcard");
-    // a comment is not a declaration
-    track("c", "# node = 1\n");
-    assert.match(run("python").log, /uninstall/);
+    const stale = "Dry run - would prune 1 stale tool entry from mise.lock: aqua:x/y";
+    // global: -g
+    assert.deepEqual(run("", stale), { status: 0, calls: ["lock -g --dry-run", "lock -g"] });
+    // a project: in its folder
+    assert.deepEqual(run("/p/q", stale), { status: 0, calls: ["-C /p/q lock --dry-run", "-C /p/q lock"] });
+    // nothing stale, or no lockfile (mise says nothing): the lock is not touched, so none is created
+    assert.deepEqual(run("", ""), { status: 0, calls: ["lock -g --dry-run"] });
+    assert.deepEqual(run("/p/q", "Dry run - would update 3 platform entries"), { status: 0, calls: ["-C /p/q lock --dry-run"] });
+    // a path with a space reaches mise as one argument
+    assert.deepEqual(run("/my proj", stale).calls[1], "-C /my proj lock");
     fs.rmSync(dir, { recursive: true });
 });
 
