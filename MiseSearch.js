@@ -289,7 +289,13 @@ function search(query, ctx) {
         });
     const hits = c > 0 ? [] : registry.filter(r => r.name.includes(base) || r.backend.toLowerCase().includes(base));
     // exact > prefix > substring > backend-only match, then shortest name
-    const score = r => r.name === base ? 0 : r.name.startsWith(base) ? 1 : r.name.includes(base) ? 2 : 3;
+    const score = r => {
+        if (r.name === base)
+            return 0;
+        if (r.name.startsWith(base))
+            return 1;
+        return r.name.includes(base) ? 2 : 3;
+    };
     hits.sort((a, b) => score(a) - score(b) || a.name.length - b.name.length);
     // names with the same backends are one package (`rg`/`ripgrep`, `node`/`nodejs`). Shown: the installed one,
     // else the one typed, else the real name (the tool part of a backend: `ripgrep`, not its alias `rg`)
@@ -313,12 +319,19 @@ function search(query, ctx) {
     const cap = b ? maxPrefixed : maxFree;   // per backend
     const seen = {};
     if (ctx.remoteSearch && term)
-        remote.filter(r => (b ? r.backend === b : searchers[r.backend].free) && r.name.toLowerCase().includes(term) && r.name !== raw && !out.some(o => o.name === r.name) && (seen[r.backend] = (seen[r.backend] || 0) + 1) <= cap).forEach(r => out.push({
-            name: r.name,
-            backend: r.backend + " · " + r.desc,
-            installed: isInstalled(r.name),
-            direct: false
-        }));
+        for (const r of remote) {
+            if (!(b ? r.backend === b : searchers[r.backend].free) || !r.name.toLowerCase().includes(term) || r.name === raw || out.some(o => o.name === r.name))
+                continue;
+            seen[r.backend] = (seen[r.backend] || 0) + 1;
+            if (seen[r.backend] > cap)
+                continue;
+            out.push({
+                name: r.name,
+                backend: `${r.backend} · ${r.desc}`,
+                installed: isInstalled(r.name),
+                direct: false
+            });
+        }
     return out;
 }
 
@@ -328,24 +341,35 @@ function search(query, ctx) {
 // "General" (no group) and one per group (`npm`, `github`...), alphabetical.
 function parseSettings(json) {
     const out = [];
-    const walk = (prefix, o) => Object.keys(o).forEach(k => {
-        const v = o[k];
-        if (!v || typeof v !== "object")
-            return;
-        if ("type" in v && "description" in v)
-            out.push({
-                key: prefix + k,
-                type: v.type,
-                value: Array.isArray(v.value) ? v.value.join(",") : String(v.value ?? ""),
-                desc: v.description || "",
-                set: !!v.source,
-                section: v.source ? "Configured" : prefix ? prefix.slice(0, -1) : "General"
-            });
-        else
-            walk(prefix + k + ".", v);
-    });
+    const walk = (prefix, o) => {
+        for (const k of Object.keys(o)) {
+            const v = o[k];
+            if (!v || typeof v !== "object")
+                continue;
+            if ("type" in v && "description" in v) {
+                let section = "General";
+                if (v.source)
+                    section = "Configured";
+                else if (prefix)
+                    section = prefix.slice(0, -1);
+                out.push({
+                    key: `${prefix}${k}`,
+                    type: v.type,
+                    value: Array.isArray(v.value) ? v.value.join(",") : String(v.value ?? ""),
+                    desc: v.description || "",
+                    set: Boolean(v.source),
+                    section: section
+                });
+            } else
+                walk(`${prefix}${k}.`, v);
+        }
+    };
     walk("", json);
-    const rank = s => (s === "Configured" ? 0 : s === "General" ? 1 : 2);
+    const rank = s => {
+        if (s === "Configured")
+            return 0;
+        return s === "General" ? 1 : 2;
+    };
     return out.sort((a, b) => rank(a.section) - rank(b.section) || a.section.localeCompare(b.section) || a.key.localeCompare(b.key));
 }
 
