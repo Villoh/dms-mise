@@ -63,7 +63,7 @@ var lockAfterUse = [
 // `"backend:name" =`, `[tools.name]`) keeps it. Nothing installed is not an error.
 var uninstallUndeclared = [
     'd="${MISE_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/mise}/tracked-configs"',
-    'e=$(printf %s "$1" | sed \'s/[][\\.*^$\\/(){}+?|]/\\\\&/g\')',
+    'e=$(printf %s "$1" | sed \'s/[][\\.*^$(){}+?|]/\\\\&/g\')',
     'for f in "$d"/*; do [ -L "$f" ] || continue; p=$(readlink -f "$f") && [ -f "$p" ] || continue',
     'grep -Eq "^[[:space:]]*(\\"$e\\"|$e)[[:space:]]*=|^[[:space:]]*\\[tools\\.(\\"$e\\"|$e)\\]" "$p" && exit 0',
     'done',

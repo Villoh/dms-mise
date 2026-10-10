@@ -58,6 +58,8 @@ test("uninstallUndeclared: uninstalls the tool, unless a tracked config still de
         const log = path.join(dir, "log");
         fs.rmSync(log, { force: true });
         const r = spawnSync("sh", ["-c", S.uninstallUndeclared, "sh", tool], { encoding: "utf8", env: Object.assign({}, process.env, { PATH: dir + ":" + process.env.PATH, LOG: log, MISE_STATE_DIR: path.join(dir, "state") }) });
+        // grep warns about an escape it does not need (`\/`), and that warning would end up in the job log
+        assert.equal(r.stderr, "", tool);
         return { status: r.status, log: fs.existsSync(log) ? fs.readFileSync(log, "utf8").trim() : "" };
     };
     track("global", '[tools]\nnode = "22"\n"aqua:sharkdp/fd" = "latest"\n"npm:@scope/pkg.js" = { version = "1" }\n[tools.ruff]\nversion = "1"\n');
