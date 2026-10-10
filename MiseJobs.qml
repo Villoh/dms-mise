@@ -51,14 +51,15 @@ Item {
     }
 
     function pushLog(line) {
-        const t = line.trim();
+        const t = line.replace(/\u001b\[[0-9;]*m/g, "").trim();   // mise colours its errors even into a pipe
         if (t && !t.startsWith("DEBUG"))   // MISE_VERBOSE noise
             log = log.concat([t]).slice(-40);
     }
 
     // the useful lines of a failed job (the tail is mostly mise's own "Version:/Location:" footer)
     function failureSummary() {
-        if (log.some(l => /No lockfile URL|not in the lockfile/.test(l)))
+        // WARN lines are other tools' noise: they must not hide the real error (an attestation failure)
+        if (log.some(l => !/WARN/.test(l) && /No lockfile URL|not in the lockfile/.test(l)))
             return "`locked = true`: mise installs nothing the lockfile lacks. Add the tool to your mise config, run `mise lock`, then `mise install` (or turn on Install with `locked` off in Settings).";
         const hit = log.filter(l => /×|│|ERROR|hint:|failed|mismatch|not found|denied|404|403/i.test(l) && !/Version:|--verbose|BACKTRACE/i.test(l));
         return (hit.length ? hit : log).slice(-4).join("\n");
