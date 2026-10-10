@@ -298,6 +298,26 @@ test("parse: capped at maxPrefixed", () => {
 
 // --- verifiers ---
 
+test("verify: aqua is asked to mise, not to upstream's registry", () => {
+    assert.equal(S.verifyUrl("aqua:BurntSushi/ripgrep"), "", "a 404 there is not what mise answers");
+    assert.equal(S.miseCheck("aqua:BurntSushi/ripgrep"), "aqua:BurntSushi/ripgrep");
+    assert.equal(S.miseCheck("aqua:ripgrep"), "aqua:ripgrep", "mise resolves a bare name too");
+    assert.equal(S.miseCheck("aqua:jq@1.7[x=y]"), "aqua:jq", "version and options are not part of the check");
+    assert.equal(S.miseCheck("aqua:"), "");
+    assert.equal(S.miseCheck("aqua:git+https://x/y"), "");
+    assert.equal(S.miseCheck("npm:foo"), "", "the others have a site to ask");
+    assert.equal(S.miseCheck("ripgrep"), "", "free text");
+});
+
+test("verify: what `mise tool --json` answers", () => {
+    assert.equal(S.toolStatus({ description: "A fast Node.js package manager", security: [] }), 200);
+    assert.equal(S.toolStatus({ description: null, security: [{ type: "checksum" }] }), 200, "no description, but a known package");
+    assert.equal(S.toolStatus({ description: null, security: [] }), 404, "what mise prints for aqua:no/existe-xyz");
+    assert.equal(S.toolStatus({ description: "" }), 404);
+    assert.equal(S.toolStatus(null), 0);
+    assert.equal(S.toolStatus("error"), 0);
+});
+
 test("verify: one URL per backend", () => {
     assert.equal(S.verifyUrl("npm:@scope/pkg"), "https://registry.npmjs.org/%40scope%2Fpkg/latest");
     assert.equal(S.verifyUrl("cargo:ripgrep"), "https://crates.io/api/v1/crates/ripgrep");
@@ -307,7 +327,6 @@ test("verify: one URL per backend", () => {
     assert.equal(S.verifyUrl("conda:ripgrep"), "https://api.anaconda.org/package/conda-forge/ripgrep");
     assert.equal(S.verifyUrl("dotnet:Avalonia"), "https://api.nuget.org/v3-flatcontainer/avalonia/index.json");
     assert.equal(S.verifyUrl("go:github.com/BurntSushi/ripgrep"), "https://proxy.golang.org/github.com/!burnt!sushi/ripgrep/@latest");
-    assert.equal(S.verifyUrl("aqua:BurntSushi/ripgrep"), "https://raw.githubusercontent.com/aquaproj/aqua-registry/main/pkgs/BurntSushi/ripgrep/registry.yaml");
     assert.equal(S.verifyUrl("github:jdx/mise"), "https://api.github.com/repos/jdx/mise");
     assert.equal(S.verifyUrl("ubi:jdx/mise"), "https://api.github.com/repos/jdx/mise");
     assert.equal(S.verifyUrl("spm:jdx/mise"), "https://api.github.com/repos/jdx/mise");
@@ -319,7 +338,6 @@ test("verify: one URL per backend", () => {
 test("verify: \"\" for specs that cannot be checked", () => {
     assert.equal(S.verifyUrl("github:mise"), "", "owner/repo needed");
     assert.equal(S.verifyUrl("github:jdx/mise/extra"), "");
-    assert.equal(S.verifyUrl("aqua:ripgrep"), "");
     assert.equal(S.verifyUrl("gitlab:project"), "");
     assert.equal(S.verifyUrl("http:foo"), "", "no verifier for that backend");
     assert.equal(S.verifyUrl("ripgrep"), "", "free text");

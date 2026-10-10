@@ -78,7 +78,7 @@ Item {
 
     // clear lookingUp once the debounce is over and no request is in flight
     function settle() {
-        lookingUp = remoteSearch && lookupQ.length >= 2 && (lookupTimer.running || (tokenAsked && !tokenReady) || verifyFetch.running || Object.keys(fetchers).some(k => fetchers[k].running));
+        lookingUp = remoteSearch && lookupQ.length >= 2 && (lookupTimer.running || (tokenAsked && !tokenReady) || verifyFetch.running || toolCheck.running || Object.keys(fetchers).some(k => fetchers[k].running));
     }
 
     // what to ask the network for this query
@@ -91,6 +91,10 @@ Item {
         const u = verified[p.bare] ? "" : Search.verifyUrl(q);
         if (u)
             verifyFetch.start(u, p.bare);
+        // names only mise can check (aqua: its registry is embedded in the binary, not upstream's)
+        const m = verified[p.bare] ? "" : Search.miseCheck(q);
+        if (m)
+            toolCheck.start(m);
         // always ask, even when the registry has the name: skipping would leave the hits of an
         // earlier, shorter query on screen and the list would depend on how you typed
         const n = p.b ? Search.maxPrefixed : Search.maxFree;
@@ -244,6 +248,40 @@ Item {
 
     Fetch {
         id: verifyFetch
+    }
+
+    // `mise tool --json <backend:tool>`, one at a time; a request that arrives meanwhile waits and replaces any
+    // older waiting one. Capped at 10 s: the first call can take several. No JSON = could not check.
+    Process {
+        id: toolCheck
+        property string spec: ""
+        property string waitSpec: ""
+        function start(s) {
+            if (running) {
+                waitSpec = s;
+                return;
+            }
+            spec = s;
+            command = ["timeout", "10", "mise", "tool", "--json", s];
+            running = true;
+        }
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let j = null;
+                try {
+                    j = JSON.parse(text);
+                } catch (e) {}
+                const s = Search.toolStatus(j);
+                root.gotVerify(toolCheck.spec, s, j, s ? "" : "mise did not answer");
+            }
+        }
+        onExited: {
+            const w = waitSpec;
+            waitSpec = "";
+            if (w)
+                start(w);
+            root.settle();
+        }
     }
     Fetch {
         id: pipxFetch
