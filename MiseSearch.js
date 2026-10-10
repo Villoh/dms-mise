@@ -369,6 +369,38 @@ function search(query, ctx) {
     return out;
 }
 
+// `mise ls --json` run outside any project -> what the GLOBAL scope has: {installed: [names], missing: [names], versions: {name: active}}.
+// Only a tool that a config declares counts (some entry has a `source`). `mise ls` also lists what is installed but
+// declared nowhere, or only by a project: those have no `source` and are not the global's, so the global must not
+// show them (it would offer to remove what other projects use). The projects filter the same way (`source.path`).
+// `missing` = declared and not installed.
+function parseGlobalLs(d) {
+    const keys = Object.keys(d || {}).filter(k => Array.isArray(d[k]) && d[k].some(x => x.source));
+    const has = k => d[k].some(x => x.installed);
+    const versions = {};
+    for (const k of keys)
+        versions[k] = (d[k].find(x => x.active) || d[k][0] || {}).version || "";
+    return {
+        installed: keys.filter(has),
+        missing: keys.filter(k => !has(k)),
+        versions: versions
+    };
+}
+
+// The bin of a version chip in a tool's details: "version" = remove just that version, "tool" = remove the tool from
+// the row's scope (what the bin of the row does), "" = no bin. `c`: have (installed), inUse (the active one in the
+// scope), removable (no tracked config uses it: mise's prunable list), sole (the only installed version), declared
+// (the row's scope declares the tool). A version nobody uses can go on its own. The active one cannot: the config
+// would ask for what is gone. Only when it is the tool's only version is it the tool itself, and then the bin does
+// what the row's bin does: `unuse`, and uninstall unless another config declares it.
+function versionBin(c) {
+    if (!c.have)
+        return "";
+    if (!c.inUse)
+        return c.removable ? "version" : "";
+    return c.sole && c.declared ? "tool" : "";
+}
+
 // `mise settings ls --all --json-extended` -> [{key, type, value, desc, set, section}]. Nested groups become
 // dotted keys (`npm.package_manager`); arrays show as `a,b`, the form `mise settings set` takes back. Only a
 // setting the user wrote in a config carries a `source`. Sections: "Configured" (those, first), then

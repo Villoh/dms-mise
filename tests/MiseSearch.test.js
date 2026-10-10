@@ -358,6 +358,47 @@ test("searchTargets: which backends a query asks", () => {
     assert.deepEqual(S.searchTargets("aqua:ripgrep", true), [], "no searcher");
 });
 
+test("parseGlobalLs: the global lists what a config declares, not what is merely installed", () => {
+    const decl = (v, over) => Object.assign({ version: v, installed: true, active: true, source: { path: "/home/u/.config/mise/config.toml", type: "mise.toml" } }, over);
+    const l = S.parseGlobalLs({
+        bun: [decl("1.4.2")],
+        // declared, an older version is installed too (no source, not active)
+        node: [decl("22.1.0"), { version: "20.0.0", installed: true, active: false }],
+        // declared and not installed
+        ruff: [decl("0.5.0", { installed: false })],
+        // installed by a project only (what `mise ls` also prints): no source anywhere
+        "aqua:sharkdp/hyperfine": [{ version: "2.0.0", installed: true, active: false }],
+        java: [{ version: "oracle-17.0.12", installed: true, active: false }]
+    });
+    assert.deepEqual(l.installed, ["bun", "node"]);
+    assert.deepEqual(l.missing, ["ruff"]);
+    assert.deepEqual(l.versions, { bun: "1.4.2", node: "22.1.0", ruff: "0.5.0" });
+    assert.ok(!("aqua:sharkdp/hyperfine" in l.versions), "not the global's: no row, no remove button");
+    // nothing usable: empty, not a crash
+    for (const bad of [null, undefined, {}, { x: "nope" }, { x: [] }])
+        assert.deepEqual(S.parseGlobalLs(bad), { installed: [], missing: [], versions: {} });
+});
+
+test("versionBin: which bin a version chip gets and what it removes", () => {
+    const c = over => Object.assign({ have: true, inUse: false, removable: false, sole: false, declared: true }, over);
+    // a version nobody uses can go on its own
+    assert.equal(S.versionBin(c({ removable: true })), "version");
+    // one another project uses (not the active one of this scope) gets no bin: that was the bug
+    assert.equal(S.versionBin(c({ inUse: false, removable: false })), "");
+    // not installed: nothing to remove
+    assert.equal(S.versionBin(c({ have: false, removable: true })), "");
+    // the active one: no bin, the config asks for it...
+    assert.equal(S.versionBin(c({ inUse: true })), "");
+    assert.equal(S.versionBin(c({ inUse: true, sole: false, declared: true })), "");
+    // ...unless it is the tool's only version: then it is the tool, and the bin does what the row's bin does
+    assert.equal(S.versionBin(c({ inUse: true, sole: true, declared: true })), "tool");
+    // but not on a row whose scope does not declare it (the install row of a tool another project installed)
+    assert.equal(S.versionBin(c({ inUse: true, sole: true, declared: false })), "");
+    assert.equal(S.versionBin(c({ sole: true, declared: false })), "");
+    // a sole version nobody uses is just a version
+    assert.equal(S.versionBin(c({ sole: true, removable: true })), "version");
+});
+
 test("failure: why a request failed", () => {
     assert.equal(S.failure(200, "5", 0), "");
     assert.equal(S.failure(0, "", 28), "timeout");

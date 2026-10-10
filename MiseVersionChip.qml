@@ -2,6 +2,7 @@ import QtQuick
 import qs.Common
 import qs.Services
 import qs.Widgets
+import "MiseSearch.js" as Search
 
 // One version of a tool in the details: click pins and installs it, the bin (installed, not active)
 // removes it after a second click.
@@ -13,6 +14,17 @@ Rectangle {
     property string scope: ""          // config the pin goes to ("" = global)
     property bool have: false          // installed
     property bool inUse: false         // the active one
+    property bool removable: false     // no tracked config uses it (mise's own prunable list)
+    property bool sole: false          // the only installed version of the tool
+    property bool declared: false      // the row's scope declares the tool
+    property string rowName: ""        // the tool as the row names it (`unuse` takes that)
+    readonly property string bin: Search.versionBin({
+        have: chip.have,
+        inUse: chip.inUse,
+        removable: chip.removable,
+        sole: chip.sole,
+        declared: chip.declared
+    })
     property bool active: false        // what the config asks for
     property real chipH: Theme.iconSizeLarge - Theme.spacingXXS
     readonly property bool armed: chipConfirm.armed   // removing a version is two-step
@@ -25,7 +37,7 @@ Rectangle {
     opacity: MiseJobs.busy ? 0.5 : 1
     MiseConfirm {
         id: chipConfirm
-        onConfirmed: MiseService.uninstallVersion(chip.tool, chip.version)
+        onConfirmed: chip.bin === "tool" ? MiseService.uninstall(chip.rowName, chip.scope) : MiseService.uninstallVersion(chip.tool, chip.version)
     }
     MouseArea {
         id: chipArea
@@ -55,10 +67,11 @@ Rectangle {
             color: chip.have ? Theme.surfaceVariantText : Theme.primary
         }
     }
-    // installed, not the active one (that one goes with the tool's own bin)
+    // see Search.versionBin: a version no config uses, or the only version of the tool (then it removes the tool).
+    // `!inUse` alone is not enough: it only knows the scope of the row, so a version another project uses would get one
     Rectangle {
         id: trashBtn
-        visible: chip.have && !chip.inUse
+        visible: chip.bin !== ""
         anchors.right: parent.right
         anchors.rightMargin: (parent.height - height) / 2   // same gap on every side
         anchors.verticalCenter: parent.verticalCenter

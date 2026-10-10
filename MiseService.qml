@@ -13,7 +13,7 @@ Item {
     property var outdatedRaw: []  // [{name, requested, current, latest}] as mise reports them
     property var ignored: []      // "name" (all versions) or "name@version" (skip that target version)
     readonly property var outdated: outdatedRaw.concat(MiseProjects.outdated).filter(t => !isIgnored(t.name, t.latest))
-    property var installed: []   // really installed: ["node", "pipx:harlequin", ...]
+    property var installed: []   // declared in the global config and installed: ["node", "pipx:harlequin", ...]
     property var missing: []     // declared in the global config but not installed (mise lists them too)
     property var versions: ({})  // name -> active version
     property var prunable: ({})  // name -> [versions] no tracked config uses (`mise ls --prunable`)
@@ -332,14 +332,10 @@ Item {
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
-                    const d = JSON.parse(text);
-                    const keys = Object.keys(d);
-                    const has = k => d[k].some(x => x.installed);
-                    root.installed = keys.filter(has);
-                    root.missing = keys.filter(k => !has(k));
-                    const v = {};
-                    keys.forEach(k => v[k] = (d[k].find(x => x.active) || d[k][0] || {}).version || "");
-                    root.versions = v;
+                    const g = Search.parseGlobalLs(JSON.parse(text));
+                    root.installed = g.installed;
+                    root.missing = g.missing;
+                    root.versions = g.versions;
                 } catch (e) {}
             }
         }
