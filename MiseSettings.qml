@@ -308,8 +308,8 @@ PluginSettings {
         readonly property var entries: MiseService.ignored
 
         function label(k) {
-            const m = k.match(/^(.*)@([^\/@:]+)$/);
-            return m ? m[1] + "  ·  skipping " + m[2] : k + "  ·  all versions";
+            const p = MiseService.parseIgnored(k);
+            return p.name + "  ·  " + (p.version ? "skipping " + p.version : "all versions") + (p.scoped ? "  ·  " + MiseProjects.label(p.scope) : "");
         }
 
         Item {

@@ -11,8 +11,10 @@ Item {
     id: root
 
     property var outdatedRaw: []  // [{name, requested, current, latest}] as mise reports them
-    property var ignored: []      // "name" (all versions) or "name@version" (skip that target version)
-    readonly property var outdated: outdatedRaw.concat(MiseProjects.outdated).filter(t => !isIgnored(t.name, t.latest))
+    // "[scope\t]name" (all versions) or "[scope\t]name@version" (skip that target version). No scope
+    // prefix = every scope (entries saved before skips were per scope); "" prefix = global
+    property var ignored: []
+    readonly property var outdated: outdatedRaw.concat(MiseProjects.outdated).filter(t => !isIgnored(t.name, t.latest, t.scope))
     property var installed: []   // declared in the global config and installed: ["node", "pipx:harlequin", ...]
     property var missing: []     // declared in the global config but not installed (mise lists them too)
     property var versions: ({})  // name -> active version
@@ -27,7 +29,7 @@ Item {
     property var bumpRaw: []      // `mise outdated --bump`: [{name, requested, current, latest, bump}]
 
     // bump-only = outdated beyond what the requested version allows; `upgrade` can't reach them
-    readonly property var bumps: showBumps ? bumpRaw.concat(MiseProjects.bumps).filter(b => !outdatedRaw.concat(MiseProjects.outdated).some(o => o.name === b.name && o.scope === b.scope) && !isIgnored(b.name, b.bump)) : []
+    readonly property var bumps: showBumps ? bumpRaw.concat(MiseProjects.bumps).filter(b => !outdatedRaw.concat(MiseProjects.outdated).some(o => o.name === b.name && o.scope === b.scope) && !isIgnored(b.name, b.bump, b.scope)) : []
 
     // bar badge: "global" (default) or "all" (global + followed projects)
     property string badgeScope: "global"
@@ -106,14 +108,28 @@ Item {
         });
     }
 
-    function isIgnored(name, version) {
-        return ignored.includes(name) || ignored.includes(name + "@" + version);
+    function isIgnored(name, version, scope) {
+        const p = (scope || "") + "\t";
+        return [name, name + "@" + version, p + name, p + name + "@" + version].some(k => ignored.includes(k));
     }
 
-    // version "" = ignore the tool whatever the version
+    // "scope\tname@1.0" -> {scoped, scope, name, version}; version "" = the tool whatever the version
+    function parseIgnored(k) {
+        const t = k.indexOf("\t");
+        const rest = k.substring(t + 1);
+        const m = rest.match(/^(.*)@([^\/@:]+)$/);
+        return {
+            scoped: t >= 0,
+            scope: t >= 0 ? k.substring(0, t) : "",
+            name: m ? m[1] : rest,
+            version: m ? m[2] : ""
+        };
+    }
+
+    // version "" = ignore the tool whatever the version; only in `scope` ("" = global)
     // ponytail: entries for versions that were superseded are never pruned, remove them from the Ignored view
-    function ignore(name, version) {
-        const k = version ? name + "@" + version : name;
+    function ignore(name, version, scope) {
+        const k = (scope || "") + "\t" + (version ? name + "@" + version : name);
         if (ignored.includes(k))
             return;
         ignored = ignored.concat([k]);

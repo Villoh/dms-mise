@@ -136,15 +136,17 @@ Item {
     // what the Update all / Bump all buttons act on: the picked scope
     readonly property int scopedCount: updRows.filter(r => !r.bump && inScope(r)).length
     readonly property int scopedBumps: updRows.filter(r => r.bump && inScope(r)).length
-    // ignored entries as rows: "name" or "name@version"
+    // ignored entries as rows (see MiseService.ignored for the key format)
     readonly property var ignoredRows: MiseService.ignored.map(k => {
-        const m = k.match(/^(.*)@([^\/@:]+)$/);
+        const p = MiseService.parseIgnored(k);
         return {
-            name: m ? m[1] : k,
+            name: p.name,
             requested: "",
             current: "",
-            latest: m ? m[2] : "",
+            latest: p.version,
             bump: false,
+            scoped: p.scoped,
+            scope: p.scope,
             ignoredKey: k
         };
     })

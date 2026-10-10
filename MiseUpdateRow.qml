@@ -50,7 +50,7 @@ Rectangle {
         }
         StyledText {
             width: parent.width
-            text: upd.row.ignoredKey ? (upd.row.latest ? "skipping " + upd.row.latest : "ignored · all versions") : (upd.row.current ? upd.row.current + " → " : "not installed → ") + upd.row.latest + (upd.row.bump ? " · bump (requested " + upd.row.requested + ")" : "") + (upd.showScope ? " · " + MiseProjects.label(upd.row.scope) : "")
+            text: upd.row.ignoredKey ? (upd.row.latest ? "skipping " + upd.row.latest : "ignored · all versions") + (upd.row.scoped ? " · " + MiseProjects.label(upd.row.scope) : "") : (upd.row.current ? upd.row.current + " → " : "not installed → ") + upd.row.latest + (upd.row.bump ? " · bump (requested " + upd.row.requested + ")" : "") + (upd.showScope ? " · " + MiseProjects.label(upd.row.scope) : "")
             font.pixelSize: Theme.fontSizeSmall
             color: Theme.surfaceVariantText
             elide: Text.ElideRight
@@ -79,7 +79,7 @@ Rectangle {
             iconName: "skip_next"
             iconColor: Theme.surfaceVariantText
             tooltipText: "Skip " + upd.row.latest + " (shows again with a newer version)"
-            onClicked: MiseService.ignore(upd.row.name, upd.row.latest)
+            onClicked: MiseService.ignore(upd.row.name, upd.row.latest, upd.row.scope)
         }
         DankActionButton {
             visible: !upd.row.ignoredKey
@@ -87,8 +87,8 @@ Rectangle {
             iconSize: upd.actionIcon
             iconName: "visibility_off"
             iconColor: Theme.surfaceVariantText
-            tooltipText: "Ignore " + upd.row.name + " (all versions)"
-            onClicked: MiseService.ignore(upd.row.name, "")
+            tooltipText: "Ignore " + upd.row.name + " (all versions, " + MiseProjects.label(upd.row.scope) + " only)"
+            onClicked: MiseService.ignore(upd.row.name, "", upd.row.scope)
         }
         DankActionButton {
             visible: !upd.row.ignoredKey
