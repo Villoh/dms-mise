@@ -2,8 +2,9 @@ import QtQuick
 import qs.Common
 import qs.Widgets
 
-// One mise setting: name, description, and a switch (boolean) or a text field (anything else, Enter
-// applies; arrays are comma separated). Reset shows for the ones set in the global config.
+// One mise setting: name, description, and a switch (boolean) or a text field (anything else; arrays
+// are comma separated). An edited field shows a save button (Enter does the same) in the slot that is
+// the reset button for the ones set in the global config.
 Rectangle {
     id: cfg
 
@@ -13,6 +14,12 @@ Rectangle {
     property real actionIcon: Theme.iconSize - Theme.spacingXS
     readonly property bool isBool: row.type === "boolean"
     readonly property bool on: row.value === "true"
+    readonly property bool dirty: !isBool && field.text !== row.value
+
+    function save() {
+        if (dirty)
+            MiseConfig.set(row.key, field.text);
+    }
 
     height: rowH
     radius: Theme.cornerRadius
@@ -54,16 +61,15 @@ Rectangle {
         anchors.right: parent.right
         anchors.rightMargin: Theme.spacingXS
         anchors.verticalCenter: parent.verticalCenter
+        spacing: Theme.spacingS
         DankTextField {
+            id: field
             visible: !cfg.isBool
             anchors.verticalCenter: parent.verticalCenter
             width: Math.round(cfg.width * 0.3)
             height: cfg.iconBtn
             text: cfg.row.value
-            onAccepted: {
-                if (text !== cfg.row.value)
-                    MiseConfig.set(cfg.row.key, text);
-            }
+            onAccepted: cfg.save()
         }
         DankToggle {
             visible: cfg.isBool
@@ -72,17 +78,17 @@ Rectangle {
             checked: cfg.on
             onToggled: MiseConfig.toggle(cfg.row.key)
         }
-        // always laid out, so the control does not jump when a setting becomes (un)set
+        // always laid out, so the control does not jump when a setting becomes (un)set or edited
         DankActionButton {
             anchors.verticalCenter: parent.verticalCenter
             buttonSize: cfg.iconBtn
             iconSize: cfg.actionIcon
-            iconName: "undo"
-            iconColor: Theme.surfaceVariantText
-            opacity: cfg.row.set ? 1 : 0
-            tooltipText: "Reset to mise's default (removes it from your global config)"
-            enabled: cfg.row.set
-            onClicked: MiseConfig.unset(cfg.row.key)
+            iconName: cfg.dirty ? "check" : "undo"
+            iconColor: cfg.dirty ? Theme.primary : Theme.surfaceVariantText
+            opacity: cfg.dirty || cfg.row.set ? 1 : 0
+            tooltipText: cfg.dirty ? "Save (Enter)" : "Reset to mise's default (removes it from your global config)"
+            enabled: cfg.dirty || cfg.row.set
+            onClicked: cfg.dirty ? cfg.save() : MiseConfig.unset(cfg.row.key)
         }
     }
 }
