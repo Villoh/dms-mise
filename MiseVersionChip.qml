@@ -13,6 +13,7 @@ Rectangle {
     property string scope: ""          // config the pin goes to ("" = global)
     property bool have: false          // installed
     property bool inUse: false         // the active one
+    property bool removable: false     // no tracked config uses it (mise's own prunable list): only then is there a bin
     property bool active: false        // what the config asks for
     property real chipH: Theme.iconSizeLarge - Theme.spacingXXS
     readonly property bool armed: chipConfirm.armed   // removing a version is two-step
@@ -55,10 +56,11 @@ Rectangle {
             color: chip.have ? Theme.surfaceVariantText : Theme.primary
         }
     }
-    // installed, not the active one (that one goes with the tool's own bin)
+    // installed and used by no config (the active one goes with the tool's own bin). `!inUse` is not enough: it
+    // only knows the scope of the row, so a version another project uses would get a bin here
     Rectangle {
         id: trashBtn
-        visible: chip.have && !chip.inUse
+        visible: chip.have && !chip.inUse && chip.removable
         anchors.right: parent.right
         anchors.rightMargin: (parent.height - height) / 2   // same gap on every side
         anchors.verticalCenter: parent.verticalCenter

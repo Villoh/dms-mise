@@ -98,6 +98,7 @@ Column {
                 chipH: details.chipH
                 have: ((details.info.meta || {}).installed_versions || []).includes(modelData)
                 inUse: ((details.info.meta || {}).active_versions || []).includes(modelData)
+                removable: details.unused.includes(modelData)
                 active: modelData === "latest" ? details.trackLatest : !details.trackLatest && inUse
             }
         }
