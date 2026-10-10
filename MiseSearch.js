@@ -213,7 +213,14 @@ function search(query, ctx) {
     const reg = registry.find(r => r.name === base);
     // registry entries that list the typed `backend:tool`: the same package as the direct row, which absorbs them
     // (description, installed state) so each package shows once, not as `direct` plus one row per registry name
-    const samePkg = c > 0 ? registry.filter(r => r.backend.toLowerCase().split(" ").includes(base)) : [];
+    // `aqua:ripgrep` has no owner: mise looks the name up in its registry and takes the entry's first aqua backend
+    // (`aqua:BurntSushi/ripgrep`), so that is the package the row stands for
+    let pkgKey = base;
+    if (b === "aqua" && !term.includes("/")) {
+        const e = registry.find(r => r.name === term);
+        pkgKey = ((e ? e.backend.split(" ") : []).find(t => t.startsWith("aqua:")) || base).toLowerCase();
+    }
+    const samePkg = c > 0 ? registry.filter(r => r.backend.toLowerCase().split(" ").includes(pkgKey)) : [];
     // plain `backend:name` that a remote hit matches: fold the hit into the direct row (canonical
     // name, description) instead of listing the same package twice. crates.io treats - and _ alike.
     const norm = b === "cargo" ? x => x.replace(/_/g, "-") : (b === "pipx" || b === "pypi") ? x => x.replace(/[-_.]+/g, "-") : x => x;
@@ -259,7 +266,7 @@ function search(query, ctx) {
         for (const r of registry)
             for (const t of r.backend.split(" ")) {
                 const rest = t.substring(b.length + 1).toLowerCase();
-                if (!t.toLowerCase().startsWith(`${b}:`) || !rest.includes(term) || t.toLowerCase() === base)
+                if (!t.toLowerCase().startsWith(`${b}:`) || !rest.includes(term) || t.toLowerCase() === pkgKey || t.toLowerCase() === base)
                     continue;
                 const e = tokens.get(t) || {
                     name: t,

@@ -100,6 +100,18 @@ test("search: backend:term finds registry entries whatever the owner in between"
     assert.deepEqual(S.search("aqua:zzzz", ctx()).map(r => r.name), ["aqua:zzzz"]);
 });
 
+test("search: aqua:name without owner stands for the aqua backend of the registry entry, as in mise", () => {
+    const rows = S.search("aqua:ripgrep", ctx({ installed: [] }));
+    assert.equal(rows[0].name, "aqua:ripgrep", "installs what was typed");
+    assert.equal(rows[0].backend, "aqua · ✓ recursive grep");
+    assert.ok(!rows.some(r => r.name === "aqua:BurntSushi/ripgrep"), "it is the same package");
+    assert.equal(S.search("aqua:ripgrep", ctx())[0].installed, true, "ripgrep is installed");
+    // not in the registry: no description, like any unknown name
+    assert.equal(S.search("aqua:nope", ctx())[0].backend, "direct · aqua");
+    // only aqua does this: `cargo:ripgrep` is a crate name, not a registry lookup
+    assert.equal(S.search("cargo:jq", ctx())[0].backend, "direct · cargo");
+});
+
 test("search: typed backend:tool listed in the registry folds its entries into the direct row", () => {
     // one row, with the description; `ripgrep` is installed, so is the package
     const rows = S.search("aqua:BurntSushi/ripgrep", ctx());
