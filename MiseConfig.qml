@@ -11,7 +11,6 @@ Item {
     id: root
 
     property var all: []   // see Search.parseSettings
-    property var defaults: ({}) // key -> mise's own default, as the row shows it
     property var queue: [] // `settings set|unset` argument lists still to run, in order
     property var err: []   // stderr of the one running
 
@@ -42,9 +41,6 @@ Item {
     // against the setting's type and its error reaches the toast. The row shows the new value at once;
     // the read after the command settles it (and puts it back if mise refused).
     function set(key, value) {
-        // back at mise's default: nothing left to configure, so drop the key like a reset does
-        if (String(value) === defaults[key])
-            return unset(key);
         all = all.map(s => s.key === key ? Object.assign({}, s, {
                 value: String(value)
             }) : s);
@@ -62,30 +58,7 @@ Item {
             set(key, s.value !== "true");
     }
 
-    Component.onCompleted: {
-        refresh();
-        defProc.running = true;
-    }
-
-    // The defaults: the same listing with no global config to override them (a setting you have set
-    // shows your value, never the default). Read once, they do not change.
-    Process {
-        id: defProc
-        command: ["mise", "settings", "ls", "--all", "--json-extended"]
-        environment: ({
-                MISE_GLOBAL_CONFIG_FILE: "/dev/null"
-            })
-        workingDirectory: "/"
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    const d = {};
-                    Search.parseSettings(JSON.parse(text)).forEach(s => d[s.key] = s.value);
-                    root.defaults = d;
-                } catch (e) {}
-            }
-        }
-    }
+    Component.onCompleted: refresh()
 
     Process {
         id: setProc
