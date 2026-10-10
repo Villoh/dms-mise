@@ -252,7 +252,42 @@ function search(query, ctx) {
             direct: true
         });
     }
-    const hits = registry.filter(r => !samePkg.includes(r) && (r.name.includes(base) || r.backend.toLowerCase().includes(base)));
+    // `backend:term`: the registry lists `aqua:BurntSushi/ripgrep`, which does not contain `aqua:ripg`. Look for the term
+    // after the prefix, as the remote search does: one row per `backend:...` entry, named as mise takes it
+    const tokens = new Map();
+    if (c > 0)
+        for (const r of registry)
+            for (const t of r.backend.split(" ")) {
+                const rest = t.substring(b.length + 1).toLowerCase();
+                if (!t.toLowerCase().startsWith(`${b}:`) || !rest.includes(term) || t.toLowerCase() === base)
+                    continue;
+                const e = tokens.get(t) || {
+                    name: t,
+                    rest: rest,
+                    desc: "",
+                    installed: false
+                };
+                e.desc = e.desc || r.desc || "";
+                e.installed = e.installed || isInstalled(r.name) || isInstalled(t);
+                tokens.set(t, e);
+            }
+    const tail = e => e.rest.split("/").pop();
+    const tokenScore = e => {
+        const t = tail(e);
+        if (t === term)
+            return 0;
+        if (t.startsWith(term))
+            return 1;
+        return t.includes(term) ? 2 : 3;
+    };
+    for (const e of Array.from(tokens.values()).sort((x, y) => tokenScore(x) - tokenScore(y) || x.rest.length - y.rest.length).slice(0, maxRegistry))
+        out.push({
+            name: e.name,
+            backend: e.desc ? `${b} · ${e.desc}` : b,
+            installed: e.installed,
+            direct: false
+        });
+    const hits = c > 0 ? [] : registry.filter(r => r.name.includes(base) || r.backend.toLowerCase().includes(base));
     // exact > prefix > substring > backend-only match, then shortest name
     const score = r => r.name === base ? 0 : r.name.startsWith(base) ? 1 : r.name.includes(base) ? 2 : 3;
     hits.sort((a, b) => score(a) - score(b) || a.name.length - b.name.length);
