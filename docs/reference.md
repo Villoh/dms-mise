@@ -9,8 +9,8 @@ Settings → Plugins → mise: check interval (15 min, 30 min, 1 h, 4 h, daily).
 | Action | Command |
 | --- | --- |
 | Check | `mise outdated --json`, `mise outdated --bump --json`, `mise ls --json` (and the same with `-C <project>` per followed project) |
-| Registry | `mise registry` (once, at load) |
-| Live search | `curl` to registry.npmjs.org, crates.io, api.github.com, pypi.org (only while typing, see [Installing tools](installing-tools.md#live-search-and-verification)) |
+| Registry | `mise registry --json` (once, at load) |
+| Live search | `curl` to registry.npmjs.org, crates.io, api.github.com, pypi.org (only while typing, see [Installing tools](installing-tools.md#live-search-and-verification)); `mise tool --json <aqua:name>` to check an `aqua:` name (10 s timeout) |
 | GitHub token | `mise token github --raw` (once per session, on the first GitHub request) |
 | Update | `mise upgrade --yes [tool]` (`mise -C <project> upgrade ...` for a project) |
 | Bump | `mise upgrade --bump --yes <tool>` (same `-C`) |
@@ -18,7 +18,7 @@ Settings → Plugins → mise: check interval (15 min, 30 min, 1 h, 4 h, daily).
 | Details | `mise tool --json <tool>`, `mise ls-remote <tool>` (30 s timeout, only when a row is expanded) |
 | Remove a version | `mise uninstall --yes <tool>@<version>` |
 | Prune | `mise ls --prunable --json` (with every check), `mise prune --tools --yes [tool]` |
-| Remove | `mise unuse --global --yes <tool>`, or `mise unuse --path <config> --yes <tool>` for a project |
+| Remove | `mise unuse --global --yes <tool>`, or `mise unuse --path <config> --yes <tool>` for a project; then `mise uninstall --yes --all <tool>` unless another config declares it (see *Limits*) |
 | Trust | `mise trust <config>` for each project you check in the list the fix button opens (shield or lock) |
 | Lock | `mise lock -g`, or `mise -C <project> lock`, for each scope you check in the same list |
 
@@ -41,6 +41,7 @@ The plugin only runs `mise` and never edits its settings; it works with these:
 
 - Without a project selected, `install` and `remove` write the **global** mise config (`~/.config/mise/config.toml`). If that file is managed (chezmoi, home-manager) it ends up dirty or read-only. Project installs write that project's `mise.toml`, so they show up in git.
 - `remove` only works on the config you pick: a tool declared only in a project fails on *Global* (and the other way round) with mise's error.
+- `remove` also deletes the installed versions, unless a config mise tracks still declares the tool. `mise unuse` alone would leave them: it keeps the tool's entries in `mise.lock`, and `mise prune` counts a lockfile as a requirement. The plugin does not change any mise setting for that: after `unuse` it looks in every tracked config (read as text, so a project that is no longer trusted still counts) for a declaration of the tool and, if there is none, runs `mise uninstall`. The stale entries stay in `mise.lock` until the next `mise lock`, which prunes them.
 - Project configs that mise does not trust fail to load; that project shows nothing and the popout says so (see *Your mise settings*).
 - `mise upgrade` respects the requested version (`node = "22"` never goes to 24, an exact pin never moves). Those show as **bump** rows (warning icon, from `mise outdated --bump`) with their own button, which runs `mise upgrade --bump <tool>` and rewrites the version in the config that declares the tool. Bumps are not counted in the badge and are never part of *Update all*. Turn them off in Settings.
 - It does not update the mise binary itself. If mise comes from nix/a package manager, update it there.

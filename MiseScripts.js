@@ -55,6 +55,21 @@ var lockAfterUse = [
     'if [ -n "$1" ]; then mise -C "$1" lock "$2"; else mise lock -g "$2"; fi'
 ].join("\n");
 
+// arg: tool. Uninstall every installed version of a tool that no tracked config declares. `mise unuse` removes
+// the tool from the config but leaves its entries in mise.lock, and `mise prune` counts a lockfile as a
+// requirement, so the version would stay. Without touching any of the user's mise settings, do what the user
+// asked (remove it) with `mise uninstall`, after the check `prune` would have made: a tracked config (read as
+// text, so a project that is no longer trusted still counts) that declares the tool as a key (`name =`,
+// `"backend:name" =`, `[tools.name]`) keeps it. Nothing installed is not an error.
+var uninstallUndeclared = [
+    'd="${MISE_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/mise}/tracked-configs"',
+    'e=$(printf %s "$1" | sed \'s/[][\\.*^$\\/(){}+?|]/\\\\&/g\')',
+    'for f in "$d"/*; do [ -L "$f" ] || continue; p=$(readlink -f "$f") && [ -f "$p" ] || continue',
+    'grep -Eq "^[[:space:]]*(\\"$e\\"|$e)[[:space:]]*=|^[[:space:]]*\\[tools\\.(\\"$e\\"|$e)\\]" "$p" && exit 0',
+    'done',
+    'exec mise uninstall --yes --all "$1"'
+].join("\n");
+
 // args: config file ("" = global), project dir, tool, version.
 // With `locked = true` mise refuses `use` for a tool the lockfile lacks. What the user would do by
 // hand: write the tool into the config, lock it, install it. `config set` only writes a plain
