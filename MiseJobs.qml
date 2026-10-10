@@ -56,12 +56,6 @@ Item {
             log = log.concat([t]).slice(-40);
     }
 
-    // a remove that left the version installed says which config still declares the tool (Scripts.uninstallUndeclared)
-    function keptNote() {
-        const k = log.find(l => l.startsWith("kept: "));
-        return k ? " · kept installed, " + k.substring(6) + " still uses it" : "";
-    }
-
     // the useful lines of a failed job (the tail is mostly mise's own "Version:/Location:" footer)
     function failureSummary() {
         // WARN lines are other tools' noise: they must not hide the real error (an attestation failure)
@@ -110,7 +104,7 @@ Item {
             }
             root.busy = false;
             if (code === 0)
-                ToastService.showInfo("mise", doneMsg + root.keptNote());
+                ToastService.showInfo("mise", doneMsg);
             else
                 ToastService.showError("mise failed", root.failureSummary());
             root.finished(code === 0);

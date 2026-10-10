@@ -55,22 +55,13 @@ var lockAfterUse = [
     'if [ -n "$1" ]; then mise -C "$1" lock "$2"; else mise lock -g "$2"; fi'
 ].join("\n");
 
-// arg: tool. Uninstall every installed version of a tool that no tracked config declares. `mise unuse` removes
-// the tool from the config but leaves its entries in mise.lock, and `mise prune` counts a lockfile as a
-// requirement, so the version would stay. Without touching any of the user's mise settings, do what the user
-// asked (remove it) with `mise uninstall`, after the check `prune` would have made: a tracked config (read as
-// text, so a project that is no longer trusted still counts) that declares the tool as a key (`name =`,
-// `"backend:name" =`, `[tools.name]`) keeps it, and the script says so (`kept: <that config>`, which the toast
-// shows) instead of staying silent. Nothing installed is not an error.
-var uninstallUndeclared = [
-    'd="${MISE_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/mise}/tracked-configs"',
-    'e=$(printf %s "$1" | sed \'s/[][\\.*^$(){}+?|]/\\\\&/g\')',
-    'for f in "$d"/*; do [ -L "$f" ] || continue; p=$(readlink -f "$f") && [ -f "$p" ] || continue',
-    'if grep -Eq "^[[:space:]]*(\\"$e\\"|$e)[[:space:]]*=|^[[:space:]]*\\[tools\\.(\\"$e\\"|$e)\\]" "$p"; then',
-    'o=$(readlink "$f"); case "$o" in "$HOME"/*) o="~${o#"$HOME"}";; esac; echo "kept: $o"; exit 0',
-    'fi',
-    'done',
-    'exec mise uninstall --yes --all "$1"'
+// arg: project dir ("" = global). After `mise unuse` the removed tool's entries stay in mise.lock, and `mise prune`
+// counts a lockfile as a requirement, so the version would stay on disk. `mise lock` is what clears them. Only when
+// mise itself says there is something stale to clear (`--dry-run` writes nothing): with no lockfile, or nothing
+// stale, the lock is not touched, so `mise lock` never creates a lockfile nobody asked for.
+var lockStale = [
+    'if [ -n "$1" ]; then set -- -C "$1" lock; else set -- lock -g; fi',
+    'if mise "$@" --dry-run 2>&1 | grep -qi stale; then exec mise "$@"; fi'
 ].join("\n");
 
 // args: config file ("" = global), project dir, tool, version.
