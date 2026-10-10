@@ -66,6 +66,32 @@ test("lockStale: `mise lock` only when mise says something is stale, for the sco
     fs.rmSync(dir, { recursive: true });
 });
 
+test("lockAfterUse: `latest` is locked with --bump and installed; a version is only locked", () => {
+    const fs = require("node:fs");
+    const os = require("node:os");
+    const path = require("node:path");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mise-"));
+    // a fake mise: logs its arguments; `settings get locked` answers what LOCKED says
+    fs.writeFileSync(path.join(dir, "mise"), '#!/bin/sh\necho "$@" >> "$LOG"\ncase "$*" in *"settings get locked"*) echo "$LOCKED";; esac\n', { mode: 0o755 });
+    const run = (prj, version, locked) => {
+        const log = path.join(dir, "log");
+        fs.rmSync(log, { force: true });
+        const r = spawnSync("sh", ["-c", S.lockAfterUse, "sh", prj, "aqua:sharkdp/bat", version], { encoding: "utf8", env: Object.assign({}, process.env, { PATH: dir + ":" + process.env.PATH, LOG: log, LOCKED: locked === undefined ? "true" : locked }) });
+        const calls = fs.readFileSync(log, "utf8").trim().split("\n").filter(c => !c.includes("settings get locked"));
+        return { status: r.status, calls: calls };
+    };
+    // global: latest -> lock --bump, then install what it locked (use resolved `latest` through the old lock)
+    assert.deepEqual(run("", "latest"), { status: 0, calls: ["lock -g --bump aqua:sharkdp/bat", "install --yes aqua:sharkdp/bat"] });
+    // a concrete version is only locked, as before
+    assert.deepEqual(run("", "0.26.0"), { status: 0, calls: ["lock -g aqua:sharkdp/bat"] });
+    // a project: in its folder
+    assert.deepEqual(run("/p", "latest"), { status: 0, calls: ["-C /p lock --bump aqua:sharkdp/bat", "-C /p install --yes aqua:sharkdp/bat"] });
+    assert.deepEqual(run("/p", "0.26.0"), { status: 0, calls: ["-C /p lock aqua:sharkdp/bat"] });
+    // without `locked` nothing runs: `mise lock` would create a lockfile nobody asked for
+    assert.deepEqual(run("", "latest", "false"), { status: 0, calls: [] });
+    fs.rmSync(dir, { recursive: true });
+});
+
 test("locked: `latest` is locked with --bump, a version is not", () => {
     const fs = require("node:fs");
     const os = require("node:os");

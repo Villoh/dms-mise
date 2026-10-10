@@ -231,7 +231,8 @@ Item {
     }
 
     function lockAfterUse(tool, scope) {
-        return ["sh", "-c", Scripts.lockAfterUse, "sh", scope ? MiseProjects.dir(scope) : "", bareName(tool)];
+        const n = bareName(tool);
+        return ["sh", "-c", Scripts.lockAfterUse, "sh", scope ? MiseProjects.dir(scope) : "", n, tool.substring(n.length + 1) || "latest"];
     }
 
     function lockedInstall(tool, scope) {

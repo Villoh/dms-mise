@@ -46,13 +46,19 @@ var fix = [
     'exit $rc'
 ].join("\n");
 
-// args: project dir ("" = global), tool. Under `locked = true`, `use` of a version that is already
+// args: project dir ("" = global), tool, version. Under `locked = true`, `use` of a version that is already
 // installed (another scope has it) needs no download: it writes the config, exits 0 and leaves the
 // lockfile without the entry. Lock it, but only when `locked` is on: `mise lock` would create a
 // lockfile nobody asked for.
+// `latest` is a request: under `locked = true` `use tool@latest` resolves it through the lockfile, so it succeeds
+// with the version already locked (a tool locked at 0.26.0 stays there, the config says `latest`) and the
+// plain `mise lock` after it keeps that version too. For `latest`, lock with `--bump` (resolve against the
+// newest release again) and install what that locked.
 var lockAfterUse = [
     'd=${1:-$HOME}; [ "$(mise -C "$d" settings get locked 2>/dev/null)" = true ] || exit 0',
-    'if [ -n "$1" ]; then mise -C "$1" lock "$2"; else mise lock -g "$2"; fi'
+    'b=; [ "$3" = latest ] && b=--bump',
+    'if [ -n "$1" ]; then mise -C "$1" lock $b "$2" && { [ -z "$b" ] || mise -C "$1" install --yes "$2"; }',
+    'else mise lock -g $b "$2" && { [ -z "$b" ] || mise install --yes "$2"; }; fi'
 ].join("\n");
 
 // arg: project dir ("" = global). After `mise unuse` the removed tool's entries stay in mise.lock, and `mise prune`
