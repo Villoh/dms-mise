@@ -175,7 +175,7 @@ Item {
     }
     readonly property var baseNames: tab === 0 ? updRows.filter(inScope).map(t => t.name) : installedRows.map(t => t.name)
     readonly property var backends: {
-        // settings: the sections of what the filter leaves, in list order (Configured, General, then by name)
+        // settings: the sections of what the filter leaves, in list order (General, then by name)
         if (tab === 2) {
             const n = {};
             const keys = [];
@@ -229,7 +229,7 @@ Item {
                 })));
     }
     // mise settings (global config): only read once the tab is opened
-    // the picked section chip; "" = all, also when the picked one is gone (reset the last Configured setting)
+    // the picked section chip; "" = all, also when the picked one is gone
     readonly property string cfgSection: tab === 2 && backends.some(b => b.key === backend) ? backend : ""
     // with a header row ({header: true, title}) before each section: a ListView `section` header kept a stale
     // title after the list was replaced

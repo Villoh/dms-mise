@@ -403,8 +403,8 @@ function versionBin(c) {
 
 // `mise settings ls --all --json-extended` -> [{key, type, value, desc, set, section}]. Nested groups become
 // dotted keys (`npm.package_manager`); arrays show as `a,b`, the form `mise settings set` takes back. Only a
-// setting the user wrote in a config carries a `source`. Sections: "Configured" (those, first), then
-// "General" (no group) and one per group (`npm`, `github`...), alphabetical.
+// setting the user wrote in a config carries a `source` (`set`). Sections: "General" (no group) first, then one
+// per group (`npm`, `github`...), alphabetical.
 function parseSettings(json) {
     const out = [];
     const walk = (prefix, o) => {
@@ -413,11 +413,7 @@ function parseSettings(json) {
             if (!v || typeof v !== "object")
                 continue;
             if ("type" in v && "description" in v) {
-                let section = "General";
-                if (v.source)
-                    section = "Configured";
-                else if (prefix)
-                    section = prefix.slice(0, -1);
+                const section = prefix ? prefix.slice(0, -1) : "General";
                 out.push({
                     key: `${prefix}${k}`,
                     type: v.type,
@@ -431,11 +427,7 @@ function parseSettings(json) {
         }
     };
     walk("", json);
-    const rank = s => {
-        if (s === "Configured")
-            return 0;
-        return s === "General" ? 1 : 2;
-    };
+    const rank = s => s === "General" ? 0 : 1;
     return out.sort((a, b) => rank(a.section) - rank(b.section) || a.section.localeCompare(b.section) || a.key.localeCompare(b.key));
 }
 
