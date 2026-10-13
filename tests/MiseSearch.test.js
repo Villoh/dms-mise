@@ -139,6 +139,13 @@ test("search: registryname@ver is a direct re-pin row for an installed tool", ()
     assert.equal(S.search("jq@1.7", ctx())[0].backend, "direct · aqua:jqlang/jq");
 });
 
+test("search: caps come from ctx when given", () => {
+    assert.equal(S.search("rip", ctx({ maxRegistry: 3 })).filter(r => !r.direct).length, 3);
+    const remote = Array.from({ length: 20 }, (_, i) => hit("npm", "rg-" + i, "npm " + i));
+    assert.equal(S.search("rg", ctx({ remote, maxFree: 2 })).filter(r => r.name.startsWith("npm:")).length, 2);
+    assert.equal(S.search("npm:rg", ctx({ remote, maxPrefixed: 4 })).filter(r => !r.direct).length, 4);
+});
+
 test("search: project scope decides what counts as installed", () => {
     const c = ctx({ installed: ["jq"], tools: { jq: "1.7" } });
     const rows = S.search("jq", c);
@@ -290,8 +297,9 @@ test("parse: deps.dev keeps packages, drops GitHub projects; pipx/pypi/go share 
     assert.deepEqual(S.parseHits("go", {}, "x"), []);
 });
 
-test("parse: capped at maxPrefixed", () => {
+test("parse: capped at maxPrefixed, or at `max`", () => {
     const many = { objects: Array.from({ length: 40 }, (_, i) => ({ package: { name: "p" + i } })) };
+    assert.equal(S.parseHits("npm", many, "p", 30).length, 30);
     assert.equal(S.parseHits("npm", many, "p").length, S.maxPrefixed);
     assert.equal(S.parseHits("npm", many, "p")[0].desc, "", "missing description -> empty string");
 });

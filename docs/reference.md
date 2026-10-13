@@ -2,9 +2,20 @@
 
 ## Settings
 
-Settings → Plugins → mise: check interval (15 min, 30 min, 1 h, 4 h, daily). Default 30 min. Also: keybind panel mode and tab, pinned/major updates, live search toggle, project tools (off / manual / tracked) and the project list.
+Settings → Plugins → mise: check interval (15 min, 30 min, 1 h, 4 h, daily). Default 30 min. Also: keybind panel mode and tab, pinned/major updates, live search toggle, result limits (below), project tools (off / manual / tracked) and the project list.
 
-## What it runs
+### Result limits
+
+Three sliders cap the rows of a search, in Tools and in the launcher:
+
+| Setting | Default | Range | Caps |
+| --- | --- | --- | --- |
+| Registry results | 12 | 1-50 | registry rows per search |
+| Live results per backend | 5 | 1-25 | npm and crates.io hits each, for plain text |
+| Live results after `backend:` | 15 | 1-50 | hits for `npm:foo`, `cargo:foo`, ... |
+
+The launcher's `set` list (50 rows) and the upgrade / bump / installed rows are not capped. With the launcher's *No trigger* option on, DMS itself keeps only the first **10** rows of each plugin, so raising these limits changes nothing past that; use the `mise` trigger for the full list.
+
 
 | Action | Command |
 | --- | --- |

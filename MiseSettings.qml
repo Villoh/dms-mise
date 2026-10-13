@@ -110,6 +110,33 @@ PluginSettings {
         defaultValue: true
     }
 
+    SliderSetting {
+        settingKey: "maxRegistry"
+        label: "Registry results"
+        description: "Most registry rows listed per search in Tools and the launcher. Default 12."
+        defaultValue: 12
+        minimum: 1
+        maximum: 50
+    }
+
+    SliderSetting {
+        settingKey: "maxFree"
+        label: "Live results per backend"
+        description: "Most npm and crates.io hits listed each, when you type plain text. Default 5. Needs Live search."
+        defaultValue: 5
+        minimum: 1
+        maximum: 25
+    }
+
+    SliderSetting {
+        settingKey: "maxPrefixed"
+        label: "Live results after `backend:`"
+        description: "Most hits listed for `npm:foo`, `cargo:foo` and the like. Default 15. Needs Live search."
+        defaultValue: 15
+        minimum: 1
+        maximum: 50
+    }
+
     ToggleSetting {
         settingKey: "installUnlocked"
         label: "Install with `locked` off"
