@@ -59,7 +59,7 @@ test("search: npm:@scope/pkg keeps its @", () => {
     assert.equal(rows[0].backend, "direct · npm");
 });
 
-test("search: ranking exact > prefix > substring, then shortest; capped at 12", () => {
+test("search: ranking exact > prefix > substring, then shortest; capped at maxRegistry", () => {
     const rows = S.search("node", ctx()).filter(r => !r.direct);
     assert.deepEqual(rows.slice(0, 2).map(r => r.name), ["node"], "nodejs lists the same backends: one package");
     assert.equal(rows[0].installed, true);
@@ -355,7 +355,7 @@ test("verify: \"\" for specs that cannot be checked", () => {
 });
 
 test("searchTargets: which backends a query asks", () => {
-    assert.deepEqual(S.searchTargets("rip", true), ["npm", "cargo"]);
+    assert.deepEqual(S.searchTargets("rip", true), ["npm", "cargo", "pipx"]);
     assert.deepEqual(S.searchTargets("npm:rip", true), ["npm"]);
     assert.deepEqual(S.searchTargets("github:mise", true), ["github"]);
     assert.deepEqual(S.searchTargets("github:jdx/mise", true), [], "owner/repo is verified, not searched");

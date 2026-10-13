@@ -35,14 +35,14 @@ function isGithub(url) {
 }
 
 // defaults; the Settings sliders override them through ctx (`search`) and `max` (`parseHits`)
-var maxRegistry = 12;   // registry rows per query
+var maxRegistry = 10;   // registry rows per query
 var maxFree = 5;        // hits per backend for free text (no prefix)
-var maxPrefixed = 15;   // hits for `backend:query`
+var maxPrefixed = 10;   // hits for `backend:query`
 
 // searcher for one deps.dev ecosystem; results mix packages and GitHub projects, keep the packages
-function depsDev(system) {
+function depsDev(system, free) {
     return {
-        free: false,
+        free: !!free,
         url: (t, n) => "https://deps.dev/_/search?q=" + encodeURIComponent(t) + "&system=" + system,
         parse: j => (j.results || []).filter(r => r.kind === "PACKAGE").map(r => ({
             name: r.name,
@@ -98,7 +98,7 @@ var searchers = {
     },
     // PyPI and Go have no search API: use the one behind deps.dev's own website (Google's Open
     // Source Insights). Unofficial and undocumented, may change without notice.
-    pipx: depsDev("pypi"),
+    pipx: depsDev("pypi", true),
     pypi: depsDev("pypi"),
     go: depsDev("go"),
     gem: {
