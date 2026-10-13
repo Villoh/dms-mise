@@ -3,6 +3,7 @@ import qs.Common
 import qs.Widgets
 import qs.Services
 import qs.Modules.Plugins
+import qs.Modules.Settings.Widgets
 import qs.Modals.FileBrowser
 
 PluginSettings {
@@ -12,206 +13,195 @@ PluginSettings {
     // Window mode needs DankFloatingWindow (DMS 1.6.0+); MiseWindow.qml does not compile without it
     readonly property bool windowSupported: Qt.createComponent(Qt.resolvedUrl("MiseWindow.qml")).status !== Component.Error
 
-    StyledText {
-        width: parent.width
-        text: "mise"
-        font.pixelSize: Theme.fontSizeLarge
-        font.weight: Font.Bold
-        color: Theme.surfaceText
-    }
-
-    StyledText {
-        width: parent.width
-        text: "Background check for outdated tools. Use the refresh button in the popout to check on demand."
-        font.pixelSize: Theme.fontSizeSmall
-        color: Theme.surfaceVariantText
-        wrapMode: Text.WordWrap
-    }
-
-    SelectionSetting {
-        settingKey: "interval"
-        label: "Check interval"
-        description: "How often to look for updates"
-        options: [
-            {
-                label: "15 minutes",
-                value: "15"
-            },
-            {
-                label: "30 minutes",
-                value: "30"
-            },
-            {
-                label: "1 hour",
-                value: "60"
-            },
-            {
-                label: "4 hours",
-                value: "240"
-            },
-            {
-                label: "Once a day",
-                value: "1440"
+    // DMS hands over `pluginService` after the page is built, and then reloads only the direct children
+    // of this page: the settings inside a card would keep their default until told to read their value
+    function reloadCards() {
+        [updatesCard, barCard, searchCard, projectsCard].forEach(card => {
+            for (let i = 0; i < card.content.length; i++) {
+                if (card.content[i].loadValue)
+                    card.content[i].loadValue();
             }
-        ]
-        defaultValue: "30"
+        });
+    }
+    onPluginServiceChanged: reloadCards()
+
+    Connections {
+        target: MiseProjects
+        function onAdded(path) {
+            pathField.text = "";
+            addError.text = "";
+        }
+        function onAddFailed(message) {
+            addError.text = message;
+        }
     }
 
-    SelectionSetting {
-        settingKey: "panelMode"
-        label: "Keybind panel"
-        description: "What `dms ipc call mise toggle` opens. Overlay: centered over everything, closes on click outside, drag the header to move it. Window: a real window, so the border and rounding come from your compositor config, and it moves and resizes natively." + (root.windowSupported ? "" : " Window needs DMS 1.6.0 or newer; the overlay is used until you update.")
-        enabled: root.windowSupported
-        options: [
-            {
-                label: "Overlay",
-                value: "modal"
-            },
-            {
-                label: root.windowSupported ? "Window" : "Window (needs DMS 1.6.0+)",
-                value: "window"
-            }
-        ]
-        defaultValue: "modal"
+    SettingsCard {
+        id: updatesCard
+        title: "Updates"
+        iconName: "system_update_alt"
+
+        MiseIntervalSlider {
+            settings: root
+            key: "interval"
+            label: "Check interval"
+            description: "How often to look for updates"
+            defaultMinutes: 720
+        }
+
+        ToggleSetting {
+            settingKey: "showBumps"
+            label: "Show pinned / major updates"
+            description: "Tools pinned to an exact version, or with a newer major, are listed with a bump button. Bumping rewrites the version in your mise config. Not counted in the badge or in Update all."
+            defaultValue: true
+        }
     }
 
-    SelectionSetting {
-        settingKey: "panelTab"
-        label: "Keybind panel opens on"
-        description: "Auto: Updates if something is pending (updates or bumps), Tools otherwise."
-        options: [
-            {
-                label: "Auto",
-                value: "auto"
-            },
-            {
-                label: "Updates",
-                value: "updates"
-            },
-            {
-                label: "Tools",
-                value: "tools"
-            }
-        ]
-        defaultValue: "auto"
+    SettingsCard {
+        id: barCard
+        title: "Bar and panel"
+        iconName: "widgets"
+
+        SelectionSetting {
+            settingKey: "panelMode"
+            label: "Keybind panel"
+            description: "What `dms ipc call mise toggle` opens. Overlay: centered over everything, closes on click outside, drag the header to move it. Window: a real window, so the border and rounding come from your compositor config, and it moves and resizes natively." + (root.windowSupported ? "" : " Window needs DMS 1.6.0 or newer; the overlay is used until you update.")
+            enabled: root.windowSupported
+            options: [
+                {
+                    label: "Overlay",
+                    value: "modal"
+                },
+                {
+                    label: root.windowSupported ? "Window" : "Window (needs DMS 1.6.0+)",
+                    value: "window"
+                }
+            ]
+            defaultValue: "modal"
+        }
+
+        SelectionSetting {
+            settingKey: "panelTab"
+            label: "Keybind panel opens on"
+            description: "Auto: Updates if something is pending (updates or bumps), Tools otherwise."
+            options: [
+                {
+                    label: "Auto",
+                    value: "auto"
+                },
+                {
+                    label: "Updates",
+                    value: "updates"
+                },
+                {
+                    label: "Tools",
+                    value: "tools"
+                }
+            ]
+            defaultValue: "auto"
+        }
+
+        SelectionSetting {
+            visible: MiseProjects.mode !== "off"
+            settingKey: "badgeScope"
+            label: "Bar badge counts"
+            description: "Global: only the global config, as before. Global + projects: also the updates and bumps of the projects you follow. The popout always shows the scope you pick there."
+            options: [
+                {
+                    label: "Global",
+                    value: "global"
+                },
+                {
+                    label: "Global + projects",
+                    value: "all"
+                }
+            ]
+            defaultValue: "global"
+        }
     }
 
-    ToggleSetting {
-        settingKey: "showBumps"
-        label: "Show pinned / major updates"
-        description: "Tools pinned to an exact version, or with a newer major, are listed with a bump button. Bumping rewrites the version in your mise config. Not counted in the badge or in Update all."
-        defaultValue: true
-    }
+    SettingsCard {
+        id: searchCard
+        title: "Search and install"
+        iconName: "manage_search"
 
-    ToggleSetting {
-        settingKey: "remoteSearch"
-        label: "Live search and verification"
-        description: "While you type in Tools / the launcher, query npm, PyPI and crates.io (gem, dotnet and GitHub after their `backend:` prefix) and check that a typed `backend:tool` exists. Sends what you type to those sites. Off = registry only."
-        defaultValue: true
-    }
+        ToggleSetting {
+            settingKey: "remoteSearch"
+            label: "Live search and verification"
+            description: "While you type in Tools / the launcher, query npm, PyPI and crates.io (gem, dotnet and GitHub after their `backend:` prefix) and check that a typed `backend:tool` exists. Sends what you type to those sites. Off = registry only."
+            defaultValue: true
+        }
 
-    SliderSetting {
-        settingKey: "maxRegistry"
-        label: "Registry results"
-        description: "Most registry rows listed per search in Tools and the launcher. Default 10."
-        defaultValue: 10
-        minimum: 1
-        maximum: 50
-    }
+        MiseLimitSlider {
+            settings: root
+            key: "maxRegistry"
+            text: "Registry results"
+            description: "Most registry rows listed per search, in Tools and the launcher."
+            defaultValue: 10
+            maximum: 50
+            unit: " results"
+        }
 
-    SliderSetting {
-        settingKey: "maxFree"
-        label: "Live results per backend"
-        description: "Most npm, PyPI and crates.io hits listed each, when you type plain text. Needs Live search. Default 5."
-        defaultValue: 5
-        minimum: 1
-        maximum: 25
-    }
+        MiseLimitSlider {
+            settings: root
+            key: "maxFree"
+            text: "Live results per backend"
+            description: "Most npm, PyPI and crates.io hits listed each when you type plain text. Needs Live search."
+            defaultValue: 5
+            maximum: 25
+            unit: " results"
+        }
 
-    SliderSetting {
-        settingKey: "maxPrefixed"
-        label: "Live results after `backend:`"
-        description: "Most hits listed for `npm:foo`, `cargo:foo` and the like. Needs Live search. Default 10."
-        defaultValue: 10
-        minimum: 1
-        maximum: 50
-    }
+        MiseLimitSlider {
+            settings: root
+            key: "maxPrefixed"
+            text: "Live results after `backend:`"
+            description: "Most hits listed for `npm:foo`, `cargo:foo` and the like. Needs Live search."
+            defaultValue: 10
+            maximum: 50
+            unit: " results"
+        }
 
-    ToggleSetting {
-        settingKey: "installUnlocked"
-        label: "Install with `locked` off"
-        description: "With `locked = true`, Install already works for plain tools (it writes the config, runs `mise lock`, then installs). Tools with [options] or a `.` in the name fail with a hint. On: Install runs with `locked` off for those too, and mise adds them to the lockfile. Update and Bump always follow your settings."
-        defaultValue: false
-    }
-
-    SelectionSetting {
-        settingKey: "projectsMode"
-        label: "Project tools"
-        description: "Also list, update, install and remove tools of project configs (mise.toml), not just the global one. Off: global only. Manual: only the projects you add below. Tracked: every config mise has already seen, plus the ones you add."
-        options: [
-            {
-                label: "Off",
-                value: "off"
-            },
-            {
-                label: "Manual",
-                value: "manual"
-            },
-            {
-                label: "Tracked",
-                value: "tracked"
-            }
-        ]
-        defaultValue: "off"
-    }
-
-    SelectionSetting {
-        visible: MiseProjects.mode !== "off"
-        settingKey: "badgeScope"
-        label: "Bar badge counts"
-        description: "Global: only the global config, as before. Global + projects: also the updates and bumps of the projects you follow. The popout always shows the scope you pick there."
-        options: [
-            {
-                label: "Global",
-                value: "global"
-            },
-            {
-                label: "Global + projects",
-                value: "all"
-            }
-        ]
-        defaultValue: "global"
+        ToggleSetting {
+            settingKey: "installUnlocked"
+            label: "Install with `locked` off"
+            description: "With `locked = true`, Install already works for plain tools (it writes the config, runs `mise lock`, then installs). Tools with [options] or a `.` in the name fail with a hint. On: Install runs with `locked` off for those too, and mise adds them to the lockfile. Update and Bump always follow your settings."
+            defaultValue: false
+        }
     }
 
     // Projects: the ones you added, and the tracked ones you dropped. Same lists as the scope picker in the popout.
-    Column {
-        id: projectsSection
-        width: parent.width
-        spacing: Theme.spacingS
+    SettingsCard {
+        id: projectsCard
+        title: "Projects"
+        iconName: "folder_special"
 
         readonly property bool active: MiseProjects.mode !== "off"
 
-        Connections {
-            target: MiseProjects
-            function onAdded(path) {
-                pathField.text = "";
-                addError.text = "";
-            }
-            function onAddFailed(message) {
-                addError.text = message;
-            }
-        }
-
-        StyledText {
-            text: "Projects"
-            font.pixelSize: Theme.fontSizeMedium
-            font.weight: Font.Medium
-            color: Theme.surfaceText
+        SelectionSetting {
+            settingKey: "projectsMode"
+            label: "Project tools"
+            description: "Also list, update, install and remove tools of project configs (mise.toml), not just the global one. Off: global only. Manual: only the projects you add below. Tracked: every config mise has already seen, plus the ones you add."
+            options: [
+                {
+                    label: "Off",
+                    value: "off"
+                },
+                {
+                    label: "Manual",
+                    value: "manual"
+                },
+                {
+                    label: "Tracked",
+                    value: "tracked"
+                }
+            ]
+            defaultValue: "off"
         }
 
         StyledText {
             width: parent.width
-            text: projectsSection.active ? "Browse for a project folder, or type the path of the folder or of its mise config file. Removing a project only stops following it, the file is never touched." : "Turn on Project tools above to follow projects."
+            text: projectsCard.active ? "Browse for a project folder, or type the path of the folder or of its mise config file. Removing a project only stops following it, the file is never touched." : "Turn Project tools on above to follow projects."
             font.pixelSize: Theme.fontSizeSmall
             color: Theme.surfaceVariantText
             wrapMode: Text.WordWrap
@@ -220,7 +210,7 @@ PluginSettings {
         Row {
             width: parent.width
             spacing: Theme.spacingS
-            visible: projectsSection.active
+            visible: projectsCard.active
 
             DankTextField {
                 id: pathField
@@ -261,7 +251,7 @@ PluginSettings {
 
         StyledText {
             width: parent.width
-            visible: projectsSection.active && MiseProjects.manual.length === 0
+            visible: projectsCard.active && MiseProjects.manual.length === 0
             text: "No projects added."
             font.pixelSize: Theme.fontSizeSmall
             color: Theme.surfaceVariantText
@@ -269,7 +259,7 @@ PluginSettings {
 
         // your list, then the tracked ones you hid (undo)
         Repeater {
-            model: projectsSection.active ? MiseProjects.manual.map(p => ({
+            model: projectsCard.active ? MiseProjects.manual.map(p => ({
                         path: p,
                         hidden: false
                     })).concat(MiseProjects.mode === "tracked" ? MiseProjects.hidden.filter(p => MiseProjects.tracked.includes(p) && !MiseProjects.manual.includes(p)).map(p => ({
@@ -278,7 +268,7 @@ PluginSettings {
                     })) : []) : []
             delegate: Rectangle {
                 required property var modelData
-                width: projectsSection.width
+                width: projectsCard.width - Theme.spacingL * 2
                 height: Theme.iconSize + Theme.spacingL
                 radius: Theme.cornerRadius
                 color: Theme.withAlpha(Theme.surfaceVariant, 0.1)
@@ -327,10 +317,10 @@ PluginSettings {
     }
 
     // Ignored updates (skipped versions / ignored tools). Same list as the `ignored N` chip in the popout.
-    Column {
-        id: ignoredSection
-        width: parent.width
-        spacing: Theme.spacingS
+    SettingsCard {
+        id: ignoredCard
+        title: "Ignored updates"
+        iconName: "visibility_off"
 
         readonly property var entries: MiseService.ignored
 
@@ -339,33 +329,19 @@ PluginSettings {
             return p.name + "  ·  " + (p.version ? "skipping " + p.version : "all versions") + (p.scoped ? "  ·  " + MiseProjects.label(p.scope) : "");
         }
 
-        Item {
-            width: parent.width
-            height: Theme.iconSize + Theme.spacingM
-
-            StyledText {
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Ignored updates"
-                font.pixelSize: Theme.fontSizeMedium
-                font.weight: Font.Medium
-                color: Theme.surfaceText
-            }
-
+        headerActions: [
             DankButton {
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                visible: ignoredSection.entries.length > 0
+                visible: ignoredCard.entries.length > 0
                 text: "Clear all"
                 iconName: "delete_sweep"
                 buttonHeight: Theme.iconSize + Theme.spacingS
                 onClicked: MiseService.clearIgnored()
             }
-        }
+        ]
 
         StyledText {
             width: parent.width
-            visible: ignoredSection.entries.length === 0
+            visible: ignoredCard.entries.length === 0
             text: "Nothing ignored. Skip a version or ignore a tool from the popout's Updates tab."
             font.pixelSize: Theme.fontSizeSmall
             color: Theme.surfaceVariantText
@@ -375,11 +351,11 @@ PluginSettings {
         // at most 6 rows tall, scrolls beyond that
         DankListView {
             width: parent.width
-            height: Math.min(ignoredSection.entries.length, 6) * (Theme.iconSize + Theme.spacingL + Theme.spacingXS)
-            visible: ignoredSection.entries.length > 0
+            height: Math.min(ignoredCard.entries.length, 6) * (Theme.iconSize + Theme.spacingL + Theme.spacingXS)
+            visible: ignoredCard.entries.length > 0
             clip: true
             spacing: Theme.spacingXS
-            model: ignoredSection.entries
+            model: ignoredCard.entries
             delegate: Rectangle {
                 required property var modelData
                 width: ListView.view ? ListView.view.width : 0
@@ -393,7 +369,7 @@ PluginSettings {
                     anchors.right: undoBtn.left
                     anchors.rightMargin: Theme.spacingS
                     anchors.verticalCenter: parent.verticalCenter
-                    text: ignoredSection.label(modelData)
+                    text: ignoredCard.label(modelData)
                     font.pixelSize: Theme.fontSizeSmall
                     color: Theme.surfaceText
                     elide: Text.ElideRight
