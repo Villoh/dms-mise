@@ -145,7 +145,7 @@ PluginSettings {
             description: "Most registry rows listed per search, in Tools and the launcher."
             defaultValue: 10
             maximum: 50
-            unit: " rows"
+            unit: " results"
         }
 
         MiseLimitSlider {
@@ -155,7 +155,7 @@ PluginSettings {
             description: "Most npm, PyPI and crates.io hits listed each when you type plain text. Needs Live search."
             defaultValue: 5
             maximum: 25
-            unit: " hits"
+            unit: " results"
         }
 
         MiseLimitSlider {
@@ -165,7 +165,7 @@ PluginSettings {
             description: "Most hits listed for `npm:foo`, `cargo:foo` and the like. Needs Live search."
             defaultValue: 10
             maximum: 50
-            unit: " hits"
+            unit: " results"
         }
 
         ToggleSetting {
