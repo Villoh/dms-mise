@@ -2,11 +2,17 @@
 
 ## Settings
 
-Settings → Plugins → mise: check interval (15 min, 30 min, 1 h, 4 h, daily). Default 30 min. Also: keybind panel mode and tab, pinned/major updates, live search toggle, result limits (below), project tools (off / manual / tracked) and the project list.
+Settings → Plugins → mise has five cards:
+
+- **Updates**: check interval (15 min, 30 min, 1 h, 4 h, daily; default 30 min) and pinned / major updates.
+- **Bar and panel**: keybind panel mode and tab, and what the bar badge counts.
+- **Search and install**: live search toggle, result limits (below) and `locked`-off installs.
+- **Projects**: project tools (off / manual / tracked) and the project list.
+- **Ignored updates**: skipped versions and ignored tools, with *Clear all*.
 
 ### Result limits
 
-Three sliders cap the rows of a search, in Tools and in the launcher:
+Three sliders (they save when you let go) cap the rows of a search, in Tools and in the launcher:
 
 | Setting | Default | Range | Caps |
 | --- | --- | --- | --- |

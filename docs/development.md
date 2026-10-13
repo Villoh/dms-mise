@@ -23,7 +23,8 @@ One file per concern, all flat in the plugin folder (Quickshell resolves them th
 | `MiseScripts.js` | The `sh` scripts the services run |
 | `MisePanel.qml` | The popout: derives the rows and the picked scope, lays out the pieces below |
 | `MisePanelToolbar`, `MiseJobBanner`, `MiseBackendChips`, `MiseUpdateRow`, `MiseConfigRow`, `MiseToolRow`, `MiseToolDetails`, `MiseVersionChip`, `MiseHttpForm` + `MiseHttpDraft`, `MiseScopeMenu`, `MiseFixMenu` | Panel pieces, fed by properties; `MiseConfirm` is the shared arm-then-confirm click |
-| `MiseBar.qml`, `MiseLauncher.qml`, `MiseDaemon.qml`, `MiseSettings.qml` | Bar widget, launcher provider, daemon, settings page |
+| `MiseBar.qml`, `MiseLauncher.qml`, `MiseDaemon.qml`, `MiseSettings.qml` | Bar widget, launcher provider, daemon, settings page (DMS `SettingsCard`s) |
+| `MiseLimitSlider.qml` | Settings slider that saves once, on release |
 
 ## Tests
 
