@@ -13,6 +13,18 @@ PluginSettings {
     // Window mode needs DankFloatingWindow (DMS 1.6.0+); MiseWindow.qml does not compile without it
     readonly property bool windowSupported: Qt.createComponent(Qt.resolvedUrl("MiseWindow.qml")).status !== Component.Error
 
+    // DMS hands over `pluginService` after the page is built, and then reloads only the direct children
+    // of this page: the settings inside a card would keep their default until told to read their value
+    function reloadCards() {
+        [updatesCard, barCard, searchCard, projectsCard].forEach(card => {
+            for (let i = 0; i < card.content.length; i++) {
+                if (card.content[i].loadValue)
+                    card.content[i].loadValue();
+            }
+        });
+    }
+    onPluginServiceChanged: reloadCards()
+
     Connections {
         target: MiseProjects
         function onAdded(path) {
@@ -25,6 +37,7 @@ PluginSettings {
     }
 
     SettingsCard {
+        id: updatesCard
         title: "Updates"
         iconName: "system_update_alt"
 
@@ -66,6 +79,7 @@ PluginSettings {
     }
 
     SettingsCard {
+        id: barCard
         title: "Bar and panel"
         iconName: "widgets"
 
@@ -128,6 +142,7 @@ PluginSettings {
     }
 
     SettingsCard {
+        id: searchCard
         title: "Search and install"
         iconName: "manage_search"
 

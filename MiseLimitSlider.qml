@@ -14,6 +14,10 @@ SettingsSliderRow {
     x: -Theme.spacingM
     width: (parent?.width ?? 0) + Theme.spacingM * 2
 
-    Component.onCompleted: value = settings.loadValue(key, defaultValue)
+    function loadValue() {
+        value = settings.loadValue(key, defaultValue);
+    }
+
+    Component.onCompleted: loadValue()
     onSliderDragFinished: finalValue => settings.saveValue(key, finalValue)
 }
