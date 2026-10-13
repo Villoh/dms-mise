@@ -104,7 +104,10 @@ Item {
             remote: MiseRemote.remote,
             verified: MiseRemote.verified,
             unchecked: MiseRemote.unchecked,
-            remoteSearch: MiseRemote.remoteSearch
+            remoteSearch: MiseRemote.remoteSearch,
+            maxRegistry: MiseRemote.maxRegistry,
+            maxFree: MiseRemote.maxFree,
+            maxPrefixed: MiseRemote.maxPrefixed
         });
     }
 

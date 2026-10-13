@@ -106,8 +106,35 @@ PluginSettings {
     ToggleSetting {
         settingKey: "remoteSearch"
         label: "Live search and verification"
-        description: "While you type in Tools / the launcher, query npm and crates.io (gem, dotnet and GitHub after their `backend:` prefix) and check that a typed `backend:tool` exists. Sends what you type to those sites. Off = registry only."
+        description: "While you type in Tools / the launcher, query npm, PyPI and crates.io (gem, dotnet and GitHub after their `backend:` prefix) and check that a typed `backend:tool` exists. Sends what you type to those sites. Off = registry only."
         defaultValue: true
+    }
+
+    SliderSetting {
+        settingKey: "maxRegistry"
+        label: "Registry results"
+        description: "Most registry rows listed per search in Tools and the launcher. Default 10."
+        defaultValue: 10
+        minimum: 1
+        maximum: 50
+    }
+
+    SliderSetting {
+        settingKey: "maxFree"
+        label: "Live results per backend"
+        description: "Most npm, PyPI and crates.io hits listed each, when you type plain text. Needs Live search. Default 5."
+        defaultValue: 5
+        minimum: 1
+        maximum: 25
+    }
+
+    SliderSetting {
+        settingKey: "maxPrefixed"
+        label: "Live results after `backend:`"
+        description: "Most hits listed for `npm:foo`, `cargo:foo` and the like. Needs Live search. Default 10."
+        defaultValue: 10
+        minimum: 1
+        maximum: 50
     }
 
     ToggleSetting {

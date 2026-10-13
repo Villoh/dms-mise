@@ -12,6 +12,10 @@ Item {
     id: root
 
     property bool remoteSearch: true   // query npm / crates.io / GitHub as you type (Settings)
+    // result caps (Settings), defaults from MiseSearch.js
+    property int maxRegistry: Search.maxRegistry
+    property int maxFree: Search.maxFree
+    property int maxPrefixed: Search.maxPrefixed
     property string lookupQ: ""       // last query handed to lookup()
     property var remoteHits: ({})     // backend -> [{name: "npm:foo", backend, desc}], from the last answer
     readonly property var remote: Search.backends.reduce((a, k) => a.concat(remoteHits[k] || []), [])
@@ -48,6 +52,13 @@ Item {
     function loadSettings() {
         const r = PluginService.loadPluginData("mise", "remoteSearch", true);
         remoteSearch = !(r === false || r === "false");
+        const cap = (key, def) => {
+            const n = parseInt(PluginService.loadPluginData("mise", key, def));
+            return n > 0 ? n : def;
+        };
+        maxRegistry = cap("maxRegistry", Search.maxRegistry);
+        maxFree = cap("maxFree", Search.maxFree);
+        maxPrefixed = cap("maxPrefixed", Search.maxPrefixed);
     }
 
     Connections {
@@ -97,7 +108,7 @@ Item {
             toolCheck.start(m);
         // always ask, even when the registry has the name: skipping would leave the hits of an
         // earlier, shorter query on screen and the list would depend on how you typed
-        const n = p.b ? Search.maxPrefixed : Search.maxFree;
+        const n = p.b ? maxPrefixed : maxFree;
         Search.searchTargets(q, remoteSearch).forEach(k => fetchers[k].start(Search.searchers[k].url(p.t, n), p.t));
     }
 
@@ -151,7 +162,7 @@ Item {
             delete m[b];
         } else {
             delete e[b];
-            m[b] = Search.parseHits(b, json, term);
+            m[b] = Search.parseHits(b, json, term, Math.max(maxFree, maxPrefixed));
         }
         lastError = e;
         remoteHits = m;

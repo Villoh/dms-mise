@@ -34,14 +34,15 @@ function isGithub(url) {
     return url.startsWith("https://api.github.com/");
 }
 
-var maxRegistry = 12;   // registry rows per query
+// defaults; the Settings sliders override them through ctx (`search`) and `max` (`parseHits`)
+var maxRegistry = 10;   // registry rows per query
 var maxFree = 5;        // hits per backend for free text (no prefix)
-var maxPrefixed = 15;   // hits for `backend:query`
+var maxPrefixed = 10;   // hits for `backend:query`
 
 // searcher for one deps.dev ecosystem; results mix packages and GitHub projects, keep the packages
-function depsDev(system) {
+function depsDev(system, free) {
     return {
-        free: false,
+        free: !!free,
         url: (t, n) => "https://deps.dev/_/search?q=" + encodeURIComponent(t) + "&system=" + system,
         parse: j => (j.results || []).filter(r => r.kind === "PACKAGE").map(r => ({
             name: r.name,
@@ -97,7 +98,7 @@ var searchers = {
     },
     // PyPI and Go have no search API: use the one behind deps.dev's own website (Google's Open
     // Source Insights). Unofficial and undocumented, may change without notice.
-    pipx: depsDev("pypi"),
+    pipx: depsDev("pypi", true),
     pypi: depsDev("pypi"),
     go: depsDev("go"),
     gem: {
@@ -186,8 +187,8 @@ function failure(status, remaining, code) {
 }
 
 // the answer of a search request as rows: [{name: "npm:foo", backend: "npm", desc}]
-function parseHits(b, json, term) {
-    return searchers[b].parse(json, term).slice(0, maxPrefixed).map(h => ({
+function parseHits(b, json, term, max) {
+    return searchers[b].parse(json, term).slice(0, max || maxPrefixed).map(h => ({
         name: `${b}:${h.name}`,
         backend: b,
         desc: h.desc || ""
@@ -206,13 +207,15 @@ function describe(j) {
 // Search registry + accept any `backend:tool` (pipx:, npm:, cargo:, github:, ...)
 // since the registry is only a curated subset of what mise can install.
 // ctx: {registry: [{name, backend: "b:t b:t", desc}], installed: [names that count as installed where it would go],
-//       tools: {name: version} there, remote, verified, unchecked, remoteSearch}
+//       tools: {name: version} there, remote, verified, unchecked, remoteSearch,
+//       maxRegistry / maxFree / maxPrefixed: optional caps, the defaults above when absent}
 function search(query, ctx) {
     const raw = alias((query || "").trim());   // keep case: github:Owner/Repo, [opts] are case-sensitive
     const q = raw.toLowerCase();
     if (!q)
         return [];
     const out = [];
+    const capRegistry = ctx.maxRegistry || maxRegistry;
     const registry = ctx.registry || [];
     const remote = ctx.remote || [];
     const verified = ctx.verified || {};
@@ -314,7 +317,7 @@ function search(query, ctx) {
             return 1;
         return t.includes(term) ? 2 : 3;
     };
-    for (const e of Array.from(tokens.values()).sort((x, y) => tokenScore(x) - tokenScore(y) || x.rest.length - y.rest.length).slice(0, maxRegistry))
+    for (const e of Array.from(tokens.values()).sort((x, y) => tokenScore(x) - tokenScore(y) || x.rest.length - y.rest.length).slice(0, capRegistry))
         out.push({
             name: e.name,
             backend: e.desc ? `${b} · ${e.desc}` : b,
@@ -341,7 +344,7 @@ function search(query, ctx) {
         if (!k || pref(r) > pref(k))
             byPkg.set(r.backend, r);
     }
-    for (const r of Array.from(byPkg.values()).slice(0, maxRegistry))
+    for (const r of Array.from(byPkg.values()).slice(0, capRegistry))
         out.push({
             name: r.name,
             backend: r.backend,
@@ -350,7 +353,7 @@ function search(query, ctx) {
         });
     // remote hits for what is being typed: free text -> backends marked `free`, `backend:q` -> that one.
     // Older hits that still match stay visible while the next request is in flight.
-    const cap = b ? maxPrefixed : maxFree;   // per backend
+    const cap = b ? ctx.maxPrefixed || maxPrefixed : ctx.maxFree || maxFree;   // per backend
     const seen = {};
     if (ctx.remoteSearch && term)
         for (const r of remote) {

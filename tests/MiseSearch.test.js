@@ -59,7 +59,7 @@ test("search: npm:@scope/pkg keeps its @", () => {
     assert.equal(rows[0].backend, "direct · npm");
 });
 
-test("search: ranking exact > prefix > substring, then shortest; capped at 12", () => {
+test("search: ranking exact > prefix > substring, then shortest; capped at maxRegistry", () => {
     const rows = S.search("node", ctx()).filter(r => !r.direct);
     assert.deepEqual(rows.slice(0, 2).map(r => r.name), ["node"], "nodejs lists the same backends: one package");
     assert.equal(rows[0].installed, true);
@@ -137,6 +137,13 @@ test("search: registryname@ver is a direct re-pin row for an installed tool", ()
     assert.equal(rows[0].backend, "re-pin node (now 22.1.0)");
     // not installed: a plain pin on its registry backend
     assert.equal(S.search("jq@1.7", ctx())[0].backend, "direct · aqua:jqlang/jq");
+});
+
+test("search: caps come from ctx when given", () => {
+    assert.equal(S.search("rip", ctx({ maxRegistry: 3 })).filter(r => !r.direct).length, 3);
+    const remote = Array.from({ length: 20 }, (_, i) => hit("npm", "rg-" + i, "npm " + i));
+    assert.equal(S.search("rg", ctx({ remote, maxFree: 2 })).filter(r => r.name.startsWith("npm:")).length, 2);
+    assert.equal(S.search("npm:rg", ctx({ remote, maxPrefixed: 4 })).filter(r => !r.direct).length, 4);
 });
 
 test("search: project scope decides what counts as installed", () => {
@@ -290,8 +297,9 @@ test("parse: deps.dev keeps packages, drops GitHub projects; pipx/pypi/go share 
     assert.deepEqual(S.parseHits("go", {}, "x"), []);
 });
 
-test("parse: capped at maxPrefixed", () => {
+test("parse: capped at maxPrefixed, or at `max`", () => {
     const many = { objects: Array.from({ length: 40 }, (_, i) => ({ package: { name: "p" + i } })) };
+    assert.equal(S.parseHits("npm", many, "p", 30).length, 30);
     assert.equal(S.parseHits("npm", many, "p").length, S.maxPrefixed);
     assert.equal(S.parseHits("npm", many, "p")[0].desc, "", "missing description -> empty string");
 });
@@ -347,7 +355,7 @@ test("verify: \"\" for specs that cannot be checked", () => {
 });
 
 test("searchTargets: which backends a query asks", () => {
-    assert.deepEqual(S.searchTargets("rip", true), ["npm", "cargo"]);
+    assert.deepEqual(S.searchTargets("rip", true), ["npm", "cargo", "pipx"]);
     assert.deepEqual(S.searchTargets("npm:rip", true), ["npm"]);
     assert.deepEqual(S.searchTargets("github:mise", true), ["github"]);
     assert.deepEqual(S.searchTargets("github:jdx/mise", true), [], "owner/repo is verified, not searched");
