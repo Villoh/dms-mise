@@ -41,33 +41,12 @@ PluginSettings {
         title: "Updates"
         iconName: "system_update_alt"
 
-        SelectionSetting {
-            settingKey: "interval"
+        MiseIntervalSlider {
+            settings: root
+            key: "interval"
             label: "Check interval"
             description: "How often to look for updates"
-            options: [
-                {
-                    label: "15 minutes",
-                    value: "15"
-                },
-                {
-                    label: "30 minutes",
-                    value: "30"
-                },
-                {
-                    label: "1 hour",
-                    value: "60"
-                },
-                {
-                    label: "4 hours",
-                    value: "240"
-                },
-                {
-                    label: "Once a day",
-                    value: "1440"
-                }
-            ]
-            defaultValue: "30"
+            defaultMinutes: 30
         }
 
         ToggleSetting {
