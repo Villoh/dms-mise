@@ -4,7 +4,7 @@
 
 Settings → Plugins → mise has five cards:
 
-- **Updates**: check interval (a slider from 15 min to a week, in 16 steps (15 and 30 min, 1, 2, 3, 4, 6, 8 and 12 h, then daily up to weekly); default 30 min) and pinned / major updates.
+- **Updates**: check interval (a slider from 15 min to a week, in 16 steps (15 and 30 min, 1, 2, 3, 4, 6, 8 and 12 h, then daily up to weekly); default 12 h) and pinned / major updates.
 - **Bar and panel**: keybind panel mode and tab, and what the bar badge counts.
 - **Search and install**: live search toggle, result limits (below) and `locked`-off installs.
 - **Projects**: project tools (off / manual / tracked) and the project list.

@@ -46,7 +46,7 @@ PluginSettings {
             key: "interval"
             label: "Check interval"
             description: "How often to look for updates"
-            defaultMinutes: 30
+            defaultMinutes: 720
         }
 
         ToggleSetting {

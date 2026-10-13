@@ -24,7 +24,7 @@ Item {
     property bool checking: false
     property string error: ""
     property double lastCheck: 0
-    property int intervalMin: 30  // minutes between background checks (Settings)
+    property int intervalMin: 720  // minutes between background checks (Settings)
     property bool showBumps: true // list pinned / newer-major versions too (Settings)
     property var bumpRaw: []      // `mise outdated --bump`: [{name, requested, current, latest, bump}]
 
@@ -41,8 +41,8 @@ Item {
     }
 
     function loadSettings() {
-        const m = parseInt(PluginService.loadPluginData("mise", "interval", "30"));
-        intervalMin = m > 0 ? m : 30;
+        const m = parseInt(PluginService.loadPluginData("mise", "interval", "720"));
+        intervalMin = m > 0 ? m : 720;
         loadState();
         badgeScope = PluginService.loadPluginData("mise", "badgeScope", "global") === "all" ? "all" : "global";
         const b = PluginService.loadPluginData("mise", "showBumps", true);

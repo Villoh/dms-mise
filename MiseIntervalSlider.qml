@@ -12,7 +12,7 @@ Column {
     required property string key
     property string label: ""
     property string description: ""
-    property int defaultMinutes: 30
+    property int defaultMinutes: 720
 
     readonly property var steps: [15, 30, 60, 120, 180, 240, 360, 480, 720, 1440, 2880, 4320, 5760, 7200, 8640, 10080]
     readonly property int defaultIndex: nearest(defaultMinutes)
