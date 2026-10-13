@@ -106,35 +106,99 @@ PluginSettings {
     ToggleSetting {
         settingKey: "remoteSearch"
         label: "Live search and verification"
-        description: "While you type in Tools / the launcher, query npm and crates.io (gem, dotnet and GitHub after their `backend:` prefix) and check that a typed `backend:tool` exists. Sends what you type to those sites. Off = registry only."
+        description: "While you type in Tools / the launcher, query npm, PyPI and crates.io (gem, dotnet and GitHub after their `backend:` prefix) and check that a typed `backend:tool` exists. Sends what you type to those sites. Off = registry only."
         defaultValue: true
     }
 
-    SliderSetting {
+    SelectionSetting {
         settingKey: "maxRegistry"
         label: "Registry results"
-        description: "Most registry rows listed per search in Tools and the launcher. Default 12."
-        defaultValue: 12
-        minimum: 1
-        maximum: 50
+        description: "Most registry rows listed per search in Tools and the launcher."
+        options: [
+            {
+                label: "5",
+                value: "5"
+            },
+            {
+                label: "10",
+                value: "10"
+            },
+            {
+                label: "15",
+                value: "15"
+            },
+            {
+                label: "20",
+                value: "20"
+            },
+            {
+                label: "30",
+                value: "30"
+            },
+            {
+                label: "50",
+                value: "50"
+            }
+        ]
+        defaultValue: "10"
     }
 
-    SliderSetting {
+    SelectionSetting {
         settingKey: "maxFree"
         label: "Live results per backend"
-        description: "Most npm and crates.io hits listed each, when you type plain text. Default 5. Needs Live search."
-        defaultValue: 5
-        minimum: 1
-        maximum: 25
+        description: "Most npm, PyPI and crates.io hits listed each, when you type plain text. Needs Live search."
+        options: [
+            {
+                label: "5",
+                value: "5"
+            },
+            {
+                label: "10",
+                value: "10"
+            },
+            {
+                label: "15",
+                value: "15"
+            },
+            {
+                label: "20",
+                value: "20"
+            }
+        ]
+        defaultValue: "5"
     }
 
-    SliderSetting {
+    SelectionSetting {
         settingKey: "maxPrefixed"
         label: "Live results after `backend:`"
-        description: "Most hits listed for `npm:foo`, `cargo:foo` and the like. Default 15. Needs Live search."
-        defaultValue: 15
-        minimum: 1
-        maximum: 50
+        description: "Most hits listed for `npm:foo`, `cargo:foo` and the like. Needs Live search."
+        options: [
+            {
+                label: "5",
+                value: "5"
+            },
+            {
+                label: "10",
+                value: "10"
+            },
+            {
+                label: "15",
+                value: "15"
+            },
+            {
+                label: "20",
+                value: "20"
+            },
+            {
+                label: "30",
+                value: "30"
+            },
+            {
+                label: "50",
+                value: "50"
+            }
+        ]
+        defaultValue: "10"
     }
 
     ToggleSetting {

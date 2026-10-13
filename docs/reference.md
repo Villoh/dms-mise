@@ -6,16 +6,19 @@ Settings → Plugins → mise: check interval (15 min, 30 min, 1 h, 4 h, daily).
 
 ### Result limits
 
-Three sliders cap the rows of a search, in Tools and in the launcher:
+Three lists cap the rows of a search, in Tools and in the launcher:
 
-| Setting | Default | Range | Caps |
+| Setting | Default | Options | Caps |
 | --- | --- | --- | --- |
-| Registry results | 12 | 1-50 | registry rows per search |
-| Live results per backend | 5 | 1-25 | npm and crates.io hits each, for plain text |
-| Live results after `backend:` | 15 | 1-50 | hits for `npm:foo`, `cargo:foo`, ... |
+| Registry results | 10 | 5, 10, 15, 20, 30, 50 | registry rows per search |
+| Live results per backend | 5 | 5, 10, 15, 20 | npm, PyPI (`pipx`) and crates.io hits each, for plain text |
+| Live results after `backend:` | 10 | 5, 10, 15, 20, 30, 50 | hits for `npm:foo`, `cargo:foo`, ... |
+
+With the defaults, plain text lists up to 10 + 5 + 5 + 5 = 25 rows, and `backend:foo` up to 1 (what you typed) + 10 + 10 = 21.
 
 The launcher's `set` list (50 rows) and the upgrade / bump / installed rows are not capped. With the launcher's *No trigger* option on, DMS itself keeps only the first **10** rows of each plugin, so raising these limits changes nothing past that; use the `mise` trigger for the full list.
 
+## What it runs
 
 | Action | Command |
 | --- | --- |
