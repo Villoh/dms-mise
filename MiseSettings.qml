@@ -110,95 +110,31 @@ PluginSettings {
         defaultValue: true
     }
 
-    SelectionSetting {
+    SliderSetting {
         settingKey: "maxRegistry"
         label: "Registry results"
-        description: "Most registry rows listed per search in Tools and the launcher."
-        options: [
-            {
-                label: "5",
-                value: "5"
-            },
-            {
-                label: "10",
-                value: "10"
-            },
-            {
-                label: "15",
-                value: "15"
-            },
-            {
-                label: "20",
-                value: "20"
-            },
-            {
-                label: "30",
-                value: "30"
-            },
-            {
-                label: "50",
-                value: "50"
-            }
-        ]
-        defaultValue: "10"
+        description: "Most registry rows listed per search in Tools and the launcher. Default 10."
+        defaultValue: 10
+        minimum: 1
+        maximum: 50
     }
 
-    SelectionSetting {
+    SliderSetting {
         settingKey: "maxFree"
         label: "Live results per backend"
-        description: "Most npm, PyPI and crates.io hits listed each, when you type plain text. Needs Live search."
-        options: [
-            {
-                label: "5",
-                value: "5"
-            },
-            {
-                label: "10",
-                value: "10"
-            },
-            {
-                label: "15",
-                value: "15"
-            },
-            {
-                label: "20",
-                value: "20"
-            }
-        ]
-        defaultValue: "5"
+        description: "Most npm, PyPI and crates.io hits listed each, when you type plain text. Needs Live search. Default 5."
+        defaultValue: 5
+        minimum: 1
+        maximum: 25
     }
 
-    SelectionSetting {
+    SliderSetting {
         settingKey: "maxPrefixed"
         label: "Live results after `backend:`"
-        description: "Most hits listed for `npm:foo`, `cargo:foo` and the like. Needs Live search."
-        options: [
-            {
-                label: "5",
-                value: "5"
-            },
-            {
-                label: "10",
-                value: "10"
-            },
-            {
-                label: "15",
-                value: "15"
-            },
-            {
-                label: "20",
-                value: "20"
-            },
-            {
-                label: "30",
-                value: "30"
-            },
-            {
-                label: "50",
-                value: "50"
-            }
-        ]
-        defaultValue: "10"
+        description: "Most hits listed for `npm:foo`, `cargo:foo` and the like. Needs Live search. Default 10."
+        defaultValue: 10
+        minimum: 1
+        maximum: 50
     }
 
     ToggleSetting {
