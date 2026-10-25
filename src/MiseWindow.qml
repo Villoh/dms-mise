@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Common
 import qs.Widgets
+import "panel"
 
 // Window mode of the keybind panel. Lives in its own file because DankFloatingWindow
 // only exists in DMS 1.6.0+: on older versions this file fails to compile, and

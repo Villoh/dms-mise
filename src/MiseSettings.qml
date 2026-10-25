@@ -5,6 +5,8 @@ import qs.Services
 import qs.Modules.Plugins
 import qs.Modules.Settings.Widgets
 import qs.Modals.FileBrowser
+import "services"
+import "settings"
 
 PluginSettings {
     id: root

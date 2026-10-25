@@ -103,7 +103,8 @@ jobs:
         env:
           NIXPKGS: github:NixOS/nixpkgs/aa48d347080940b8a2b8d2f48228674e280a3514
         run: |
-          nix shell "$NIXPKGS#qt6.qtdeclarative" -c qmlformat -i *.qml
+          nix shell "$NIXPKGS#qt6.qtdeclarative" -c \
+            qmlformat -i $(find src -name "*.qml")
           git diff --exit-code
 
   qml-lint:
@@ -127,7 +128,7 @@ jobs:
           nix shell "$NIXPKGS#qt6.qtdeclarative" -c qmllint \
             --import disable --unresolved-type disable --unqualified disable \
             --missing-property disable --missing-type disable \
-            --compiler disable *.qml
+            --compiler disable $(find src -name "*.qml")
 
   node-test:
     runs-on: ubuntu-latest
@@ -138,7 +139,8 @@ jobs:
       # yamllint disable-line rule:line-length
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24
 
-      # Pure logic (MiseSearch.js) against recorded API answers in tests/fixtures.
+      # Pure logic (src/services/MiseSearch.js) against recorded API answers
+      # in tests/fixtures.
       # Standard library only: no package.json, no dependencies.
       - name: node --test
         env:

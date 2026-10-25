@@ -13,11 +13,11 @@
     "ipc"
   ],
   "components": {
-    "daemon": "./MiseDaemon.qml",
-    "widget": "./MiseBar.qml",
-    "launcher": "./MiseLauncher.qml"
+    "daemon": "./src/MiseDaemon.qml",
+    "widget": "./src/MiseBar.qml",
+    "launcher": "./src/MiseLauncher.qml"
   },
-  "settings": "./MiseSettings.qml",
+  "settings": "./src/MiseSettings.qml",
   "trigger": "mise",
   "requires_dms": ">=1.5.0",
   "permissions": [

@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Common
 import qs.Widgets
+import "../services"
 
 // One mise setting: name, description, and a switch (boolean) or a text field (anything else; arrays
 // are comma separated). An edited field shows a save button (Enter does the same) in the slot that is

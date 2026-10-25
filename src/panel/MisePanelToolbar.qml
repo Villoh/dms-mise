@@ -2,6 +2,7 @@ import QtQuick
 import qs.Common
 import qs.Services
 import qs.Widgets
+import "../services"
 
 // Top row of the panel: Updates / Tools / Settings tabs, the scope picker button (projects on), the fix button when
 // the picked scope needs `mise trust` / `mise lock`, and refresh.

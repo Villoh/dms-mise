@@ -1,4 +1,5 @@
 import QtQuick
+import "../services"
 
 // What is typed into the `http:` install form, and the `mise use` spec it adds up to. Lives on the
 // panel so the text survives the tool list being rebuilt; asks MiseInfo whether `latest` resolves.

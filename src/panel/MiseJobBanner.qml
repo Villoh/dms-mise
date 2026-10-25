@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Common
 import qs.Widgets
+import "../services"
 
 // What mise is doing right now: the job label and its last output line. Collapses when idle.
 Rectangle {

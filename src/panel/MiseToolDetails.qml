@@ -2,6 +2,7 @@ import QtQuick
 import qs.Common
 import qs.Services
 import qs.Widgets
+import "../services"
 
 // Expanded tool row: description, backend and installed versions, a prune chip for the versions no
 // config uses, and a chip per version to pin.

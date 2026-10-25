@@ -3,7 +3,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { load, fixture } = require("./load");
 
-const S = load("MiseSearch.js");
+const S = load("src/services/MiseSearch.js");
 
 const registry = [
     { name: "node", backend: "core:node" },

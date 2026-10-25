@@ -30,4 +30,4 @@ Bump `version` in `plugin.json`, merge, then tag `vX.Y.Z` on `main`.
 - Style from theme tokens (spacing, radius, font sizes); no hardcoded sizes or fonts.
 - User-facing text and docs in English.
 - New user-visible behaviour updates README or `docs/` in the same PR.
-- Format QML with the `qmlformat` that CI pins (`NIXPKGS` in `.github/workflows/ci.yml`): `nix shell "$NIXPKGS#qt6.qtdeclarative" -c qmlformat -i *.qml`. Other Qt versions format differently.
+- Format QML with the `qmlformat` that CI pins (`NIXPKGS` in `.github/workflows/ci.yml`): `nix shell "$NIXPKGS#qt6.qtdeclarative" -c qmlformat -i $(find src -name "*.qml")`. Other Qt versions format differently.

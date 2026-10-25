@@ -4,6 +4,8 @@ import qs.Common
 import qs.Modals.Common
 import qs.Modules.Plugins
 import qs.Services
+import "services"
+import "panel"
 
 // Keybind panel:  dms ipc call mise toggle   (also: open, close)
 // Two surfaces, picked in Settings -> "Keybind panel":
