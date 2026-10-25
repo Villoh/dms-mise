@@ -2,6 +2,7 @@ import QtQuick
 import qs.Common
 import qs.Services
 import qs.Widgets
+import "../services"
 
 // One tool of the Tools tab: installed (version, details, remove), installable (download), or the
 // `http:` template row that expands into the install form.

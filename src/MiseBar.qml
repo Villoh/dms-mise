@@ -2,6 +2,8 @@ import QtQuick
 import qs.Common
 import qs.Widgets
 import qs.Modules.Plugins
+import "services"
+import "panel"
 
 PluginComponent {
     id: root

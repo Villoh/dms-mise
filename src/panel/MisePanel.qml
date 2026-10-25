@@ -3,6 +3,7 @@ import qs.Common
 import qs.Widgets
 import qs.Services
 import qs.Modals.FileBrowser
+import "../services"
 
 // Updates / Tools UI shared by the bar popout (MiseBar.qml) and the keybind modal (MiseDaemon.qml).
 Item {

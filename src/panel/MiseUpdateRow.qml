@@ -2,6 +2,7 @@ import QtQuick
 import qs.Common
 import qs.Services
 import qs.Widgets
+import "../services"
 
 // One pending update / bump, or one ignored entry: name, "current → latest", and the skip / ignore /
 // update buttons (undo for ignored ones).

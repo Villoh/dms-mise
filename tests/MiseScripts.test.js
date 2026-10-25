@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
 const { load } = require("./load");
 
-const S = load("MiseScripts.js");
+const S = load("src/services/MiseScripts.js");
 const scripts = ["project", "tracked", "resolve", "fix", "lockAfterUse", "lockStale", "locked"];
 
 test("every script is a non-empty string", () => {

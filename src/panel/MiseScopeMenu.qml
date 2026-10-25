@@ -2,6 +2,7 @@ import QtQuick
 import qs.Common
 import qs.Services
 import qs.Widgets
+import "../services"
 
 // Scope picker: Global / All / each followed project, with its pending count and a Stop-following button,
 // then "Add project…" (folder browser, or a typed path in place). The owner positions it and holds the scrim.

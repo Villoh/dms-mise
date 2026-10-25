@@ -2,6 +2,7 @@ import QtQuick
 import qs.Common
 import qs.Services
 import qs.Widgets
+import "../services"
 
 // What the fix button runs: the scopes that need `mise trust` (paranoid) and the ones that need `mise lock`, in
 // two sections, a checkbox each, and one button for the checked ones. The owner positions it and holds the scrim.

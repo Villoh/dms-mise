@@ -2,6 +2,7 @@ import QtQuick
 import qs.Common
 import qs.Services
 import qs.Widgets
+import "../services"
 
 // Install form for the `http:` backend: paste a mise.toml block or fill name / URL / version list and the
 // options, see the spec and whether `latest` resolves, install. The text is the owner's MiseHttpDraft.

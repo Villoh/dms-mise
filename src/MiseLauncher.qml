@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Services
+import "services"
 
 QtObject {
     id: root

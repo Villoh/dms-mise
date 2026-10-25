@@ -2,7 +2,8 @@ import QtQuick
 import qs.Common
 import qs.Services
 import qs.Widgets
-import "MiseSearch.js" as Search
+import "../services/MiseSearch.js" as Search
+import "../services"
 
 // One version of a tool in the details: click pins and installs it, the bin (installed, not active)
 // removes it after a second click.
