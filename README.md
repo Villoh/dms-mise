@@ -1,8 +1,8 @@
-# mise for DankMaterialShell
+# mise for Dux Shell
 
 Install, update and remove [mise](https://mise.jdx.dev) tools from DMS.
 
-Composite plugin: a **DankBar widget**, a **keybind panel** (same UI, no bar needed) and a **launcher** (`mise` trigger).
+Composite plugin: a **DuxBar widget**, a **keybind panel** (same UI, no bar needed) and a **launcher** (`mise` trigger).
 
 | Updates | Tools |
 | :---: | :---: |
@@ -10,7 +10,7 @@ Composite plugin: a **DankBar widget**, a **keybind panel** (same UI, no bar nee
 
 ## Install
 
-Needs [DMS](https://danklinux.com) 1.5.0 or newer (1.6.0 for the keybind panel's *Window* look) and `mise` on your `PATH`. `curl` is used for live search.
+Needs [DMS](https://duxlabs.dev/) 1.5.0 or newer (1.6.0 for the keybind panel's *Window* look) and `mise` on your `PATH`. `curl` is used for live search.
 
 ```sh
 dms plugins install mise
