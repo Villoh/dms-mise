@@ -23,7 +23,7 @@ One file per concern, all under `src/`. The entry points that `plugin.json` name
 | `services/MiseScripts.js` | The `sh` scripts the services run |
 | `panel/MisePanel.qml` | The popout: derives the rows and the picked scope, lays out the pieces below |
 | `panel/`: `MisePanelToolbar`, `MiseJobBanner`, `MiseBackendChips`, `MiseUpdateRow`, `MiseConfigRow`, `MiseToolRow`, `MiseToolDetails`, `MiseVersionChip`, `MiseHttpForm` + `MiseHttpDraft`, `MiseScopeMenu`, `MiseFixMenu` | Panel pieces, fed by properties; `MiseConfirm` is the shared arm-then-confirm click |
-| `MiseBar.qml`, `MiseLauncher.qml`, `MiseDaemon.qml`, `MiseSettings.qml` (`src/`) | Bar widget, launcher provider, daemon, settings page (DMS `SettingsCard`s) |
+| `MiseBar.qml`, `MiseLauncher.qml`, `MiseDaemon.qml`, `MiseSettings.qml` (`src/`) | Bar widget, launcher provider, daemon, settings page (`settings/MiseCard`s) |
 | `settings/MiseLimitSlider.qml`, `settings/MiseIntervalSlider.qml` | Settings sliders that save once, on release (the second walks a fixed scale of check intervals) |
 
 ## Tests

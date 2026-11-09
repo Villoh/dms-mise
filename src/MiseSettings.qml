@@ -38,7 +38,7 @@ PluginSettings {
         }
     }
 
-    SettingsCard {
+    MiseCard {
         id: updatesCard
         title: "Updates"
         iconName: "system_update_alt"
@@ -59,7 +59,7 @@ PluginSettings {
         }
     }
 
-    SettingsCard {
+    MiseCard {
         id: barCard
         title: "Bar and panel"
         iconName: "widgets"
@@ -122,7 +122,7 @@ PluginSettings {
         }
     }
 
-    SettingsCard {
+    MiseCard {
         id: searchCard
         title: "Search and install"
         iconName: "manage_search"
@@ -173,7 +173,7 @@ PluginSettings {
     }
 
     // Projects: the ones you added, and the tracked ones you dropped. Same lists as the scope picker in the popout.
-    SettingsCard {
+    MiseCard {
         id: projectsCard
         title: "Projects"
         iconName: "folder_special"
@@ -319,7 +319,7 @@ PluginSettings {
     }
 
     // Ignored updates (skipped versions / ignored tools). Same list as the `ignored N` chip in the popout.
-    SettingsCard {
+    MiseCard {
         id: ignoredCard
         title: "Ignored updates"
         iconName: "visibility_off"
