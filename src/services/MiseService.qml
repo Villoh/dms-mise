@@ -290,6 +290,7 @@ Item {
     Component.onCompleted: {
         loadSettings();
         regProc.running = true;
+        backendsProc.running = true;
     }
 
     Timer {
@@ -374,6 +375,15 @@ Item {
                     root.prunable = p;
                 } catch (e) {}
             }
+        }
+    }
+
+    // which backends this mise has: picks `pypi` or `pipx` for PyPI (see MiseSearch.setPython)
+    Process {
+        id: backendsProc
+        command: ["mise", "backends", "ls"]
+        stdout: StdioCollector {
+            onStreamFinished: Search.setPython(text.split("\n").map(l => l.trim()))
         }
     }
 
