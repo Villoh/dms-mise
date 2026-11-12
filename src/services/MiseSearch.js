@@ -3,9 +3,33 @@
 // Pure search logic: no Quickshell or Qt imports, so `node --test tests/` can run it.
 // MiseService / MiseRemote hand it their state as plain arguments.
 
-// mise has no `pypi:` backend, its name is `pipx:`: search, lookup and installs all use that
+// The backend that installs from PyPI. Older mise only has `pipx:`; newer mise has `pypi:`, and
+// keeps `pipx:` as another name that mise counts as a different tool (a second copy, its own
+// lock entry). MiseService sets it from `mise backends ls`.
+var python = "pipx";
+
+function setPython(backends) {
+    python = (backends || []).includes("pypi") ? "pypi" : "pipx";
+}
+
+// `pypi:` typed on a mise without it -> `pipx:`. Where both exist, a typed prefix stays as typed.
 function alias(q) {
-    return q.replace(/^\s*pypi:/i, "pipx:");
+    return python === "pipx" ? q.replace(/^\s*pypi:/i, "pipx:") : q;
+}
+
+// searched for plain text: the backends marked `free`, and of pipx/pypi only the one mise uses
+function isFree(k) {
+    return k === "pipx" || k === "pypi" ? k === python : searchers[k].free;
+}
+
+// A PyPI hit for a package installed under the other prefix: the installed name, so the row shows
+// it as installed instead of offering a second copy.
+function installedTwin(name, isInstalled) {
+    const m = name.match(/^(pipx|pypi):(.*)$/);
+    if (!m || isInstalled(name))
+        return name;
+    const twin = (m[1] === "pipx" ? "pypi:" : "pipx:") + m[2];
+    return isInstalled(twin) ? twin : name;
 }
 
 // `npm:foo@1.2` / `foo[opt=x]` -> `npm:foo`  (npm:@scope/pkg keeps its @)
@@ -172,7 +196,7 @@ function searchTargets(q, remoteSearch) {
     // `@scope/...` and paths are not search terms
     if (p.t.length < 3 || /^[@/]|:\/\//.test(p.t))
         return [];
-    return backends.filter(k => (p.b ? p.b === k : searchers[k].free) && searchers[k].url(p.t, 1));
+    return backends.filter(k => (p.b ? p.b === k : isFree(k)) && searchers[k].url(p.t, 1));
 }
 
 // why a request failed ("" = 200). remaining = x-ratelimit-remaining header, code = curl's exit code
@@ -204,7 +228,7 @@ function describe(j) {
     return String(d).trim().replace(/\s+/g, " ").substring(0, 80);
 }
 
-// Search registry + accept any `backend:tool` (pipx:, npm:, cargo:, github:, ...)
+// Search registry + accept any `backend:tool` (pypi:, npm:, cargo:, github:, ...)
 // since the registry is only a curated subset of what mise can install.
 // ctx: {registry: [{name, backend: "b:t b:t", desc}], installed: [names that count as installed where it would go],
 //       tools: {name: version} there, remote, verified, unchecked, remoteSearch,
@@ -357,15 +381,16 @@ function search(query, ctx) {
     const seen = {};
     if (ctx.remoteSearch && term)
         for (const r of remote) {
-            if (!(b ? r.backend === b : searchers[r.backend].free) || !r.name.toLowerCase().includes(term) || r.name === raw || out.some(o => o.name === r.name))
+            const name = installedTwin(r.name, isInstalled);
+            if (!(b ? r.backend === b : isFree(r.backend)) || !r.name.toLowerCase().includes(term) || r.name === raw || out.some(o => o.name === name))
                 continue;
             seen[r.backend] = (seen[r.backend] || 0) + 1;
             if (seen[r.backend] > cap)
                 continue;
             out.push({
-                name: r.name,
-                backend: `${r.backend} · ${r.desc}`,
-                installed: isInstalled(r.name),
+                name: name,
+                backend: `${name.substring(0, name.indexOf(":"))} · ${r.desc}`,
+                installed: isInstalled(name),
                 direct: false
             });
         }

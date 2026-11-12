@@ -526,7 +526,7 @@ Item {
                 if (pop.tab === 2)
                     return MiseConfig.all.length ? "No settings match" : "Loading settings…";
                 if (!pop.searching)
-                    return "Nothing installed yet.\nType a name, or any backend:tool\ne.g. pipx:package, npm:package, cargo:crate, github:owner/repo\nOptions: pipx:package[uvx_args=--python 3.14]";
+                    return "Nothing installed yet.\nType a name, or any backend:tool\ne.g. pypi:package, npm:package, cargo:crate, github:owner/repo\nOptions: pypi:package[uvx_args=--python 3.14]";
                 if (MiseRemote.lookingUp)
                     return "Searching…";
                 return MiseService.registry.length ? "No matches. Use backend:tool to install anything else." : "Loading registry…";

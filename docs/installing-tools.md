@@ -3,7 +3,7 @@
 The registry is only a curated subset. Type any `backend:tool` and use it as-is:
 
 ```text
-pipx:package
+pypi:package
 npm:package
 cargo:crate
 github:Owner/repo
@@ -12,11 +12,13 @@ github:Owner/repo
 Tool options go in brackets, exactly as `mise use` accepts them:
 
 ```text
-pipx:package[uvx_args=--python 3.14]
+pypi:package[uvx_args=--python 3.14]
 npm:package[allow_builds=["node-pty"]]
 ```
 
 They are written to the config as an inline table and kept on updates. Text is passed unchanged, so it is case-sensitive.
+
+PyPI packages go through `pypi:`. An older mise has only `pipx:`, and there `pypi:` is read as `pipx:`. On a newer mise `pipx:` still works, but mise counts `pipx:x` and `pypi:x` as two tools (two copies, two lock entries), so a search hit for a package you installed as `pipx:` shows that row, installed, instead of offering it again. `mise backends switch` moves a tool to the backend the registry recommends.
 
 Tools that need several options, like the `http` backend, have a form: type `http:` and click the *custom download URL* row. Fill in the name, the download URL (with `{{version}}` in it) and a version list URL. If that list is JSON, add the path of the version in it (`.version`, `.[].tag_name`); if it is HTML or text, a regex with one capture group. Tick *List is not oldest first* for GitHub releases (and anything newest first): mise takes the last entry as `latest`, so without it you get the oldest release (`version_order=semver`). *Advanced* has `strip_components`, `bin_path`, `rename_exe`, `format` and `checksum_url` (read by `mise lock`, not by install; a fixed `checksum` is left out because it breaks on the next release).
 
@@ -28,7 +30,7 @@ http:devin[url=https://static.devin.ai/cli/{{version}}/devin-{{version}}-x86_64-
 
 The version list is what lets `latest` resolve and shows up in the version chips. No `checksum` is needed (it is a fixed value, so it would break on the next release).
 
-Pin a version with `@`: `ripgrep@14.0.3` or `pipx:package@1.2`. The version part is *not* a prefix filter, it is what `mise use` writes, so `@14.0.3` pins exactly and `@14` follows the latest 14.x. (The separator is `@`, not `:`.) Entries with a version or options always show as installable, even if the tool is already installed, so you can re-pin or reconfigure it.
+Pin a version with `@`: `ripgrep@14.0.3` or `pypi:package@1.2`. The version part is *not* a prefix filter, it is what `mise use` writes, so `@14.0.3` pins exactly and `@14` follows the latest 14.x. (The separator is `@`, not `:`.) Entries with a version or options always show as installable, even if the tool is already installed, so you can re-pin or reconfigure it.
 
 ## Details and versions
 
@@ -41,11 +43,11 @@ Installed versions that no config mise tracks uses (the ones *Prune N unused* li
 Beyond the registry, typing in Tools (or the launcher) also queries the package sites, debounced (350 ms, 3+ characters):
 
 - **free text**: registry (10) plus npm, PyPI and crates.io (5 each); the numbers are the defaults, see [Result limits](reference.md#result-limits), shown as `npm:name` / `cargo:name` with the description
-- **`backend:q`**: that backend only, up to 10 hits (default). Searchable: `npm`, `cargo`, `github` (no `/`), `gem`, `dotnet`, `pipx` (`pypi:` is read as `pipx:`, mise has no `pypi` backend) and `go` (see below), `conda` (conda-forge only: anaconda.org searches every channel and takes 1-3 s). Other backends are not searched freely so plain text does not drown in results (GitHub also allows only 10 searches a minute unauthenticated)
-- a typed `backend:tool` is checked against the site: `✓ description` or `✗ not found`. Verified: `npm`, `cargo`, `pipx`/`pypi`, `gem`, `conda` (conda-forge), `dotnet`, `go` (module path), `aqua` (asked to `mise tool`, see below), `github`, `ubi`, `spm`, `gitlab` (`owner/repo`). A hint only, Enter still installs (private registries). When a search hit is the same package as what you typed (any capitalization; `-`/`_` for cargo), the two are one row, with the hit's canonical name and description. Entries with `@version` or `[options]` always stay as typed
+- **`backend:q`**: that backend only, up to 10 hits (default). Searchable: `npm`, `cargo`, `github` (no `/`), `gem`, `dotnet`, `pypi` (`pipx` on an older mise, see above) and `go` (see below), `conda` (conda-forge only: anaconda.org searches every channel and takes 1-3 s). Other backends are not searched freely so plain text does not drown in results (GitHub also allows only 10 searches a minute unauthenticated)
+- a typed `backend:tool` is checked against the site: `✓ description` or `✗ not found`. Verified: `npm`, `cargo`, `pypi`/`pipx`, `gem`, `conda` (conda-forge), `dotnet`, `go` (module path), `aqua` (asked to `mise tool`, see below), `github`, `ubi`, `spm`, `gitlab` (`owner/repo`). A hint only, Enter still installs (private registries). When a search hit is the same package as what you typed (any capitalization; `-`/`_` for cargo), the two are one row, with the hit's canonical name and description. Entries with `@version` or `[options]` always stay as typed
 - the registry works the same way, offline: when a typed `backend:tool` is one of an entry's backends (`aqua:BurntSushi/ripgrep` is one of `ripgrep`'s), that entry is not listed again. The row you typed takes its description and its installed state, and still installs what you typed. Registry names that list the same backends (`rg` and `ripgrep`, `node` and `nodejs`) are one row in every search; if one of them is installed, that is the one shown, else the one you typed, else the real name. After `backend:`, the registry is searched for the term whatever the owner in between, so `aqua:ripg` lists `aqua:BurntSushi/ripgrep` and `aqua:phiresky/ripgrep-all`, each as the `backend:tool` it installs
 
-No search for `aqua`, `gitlab` (search is unranked noise), `ubi`, `spm`, `http`, `s3`, `asdf`, `vfox`: exact name only, or use the registry. PyPI and Go have no search API (PyPI's was disabled in 2021 and `pypi.org/search` sits behind a JavaScript challenge), so `pipx:q`, `pypi:q` and `go:q` use the search behind [deps.dev](https://deps.dev)'s own website (Google's Open Source Insights): a plain JSON endpoint, ranked by relevance, no key. It is **unofficial and undocumented**, so it may change or disappear without notice; if it fails you get the notice below and the exact-name check still works. Rows show the latest version, not a description.
+No search for `aqua`, `gitlab` (search is unranked noise), `ubi`, `spm`, `http`, `s3`, `asdf`, `vfox`: exact name only, or use the registry. PyPI and Go have no search API (PyPI's was disabled in 2021 and `pypi.org/search` sits behind a JavaScript challenge), so `pypi:q`, `pipx:q` and `go:q` use the search behind [deps.dev](https://deps.dev)'s own website (Google's Open Source Insights): a plain JSON endpoint, ranked by relevance, no key. It is **unofficial and undocumented**, so it may change or disappear without notice; if it fails you get the notice below and the exact-name check still works. Rows show the latest version, not a description.
 
 `aqua:` names are not looked up on the web: mise resolves them with a registry embedded in its binary, which is not the upstream aqua-registry (a renamed repo is a 404 there and still installs). The plugin runs `mise tool --json <name>`, which answers a description for a name it knows and nothing for one it does not (`aqua:ripgrep` works too: mise looks the bare name up in its registry). It runs only while *Live search and verification* is on, one at a time, and can take a second or two the first time.
 

@@ -463,3 +463,43 @@ test("filterSettings: name or description, any case", () => {
     assert.deepEqual(S.filterSettings(l, "safe").map(s => s.key), ["paranoid"]);
     assert.equal(S.filterSettings(l, "").length, 2);
 });
+
+// mise with a `pypi` backend: `pipx:` still works but names another tool, so nothing is rewritten,
+// plain text searches PyPI as `pypi`, and a package installed as `pipx:` is not offered twice.
+// The backend is module state: every test sets it and puts the default back.
+function withPypi(fn) {
+    S.setPython(["aqua", "pypi", "npm"]);
+    try {
+        fn();
+    } finally {
+        S.setPython([]);
+    }
+}
+
+test("pypi backend: what `mise backends ls` lists decides", () => {
+    assert.equal(S.alias("pypi:ruff"), "pipx:ruff", "default: an older mise");
+    withPypi(() => {
+        assert.equal(S.alias("pypi:ruff"), "pypi:ruff");
+        assert.equal(S.alias("pipx:ruff"), "pipx:ruff", "a typed pipx: stays: it is another tool to mise");
+        assert.deepEqual(S.searchTargets("rip", true), ["npm", "cargo", "pypi"]);
+        assert.deepEqual(S.searchTargets("pipx:ruff", true), ["pipx"]);
+    });
+    S.setPython(["aqua", "pipx"]);
+    assert.deepEqual(S.searchTargets("rip", true), ["npm", "cargo", "pipx"]);
+    S.setPython([]);
+});
+
+test("pypi backend: a hit installed under the other prefix is that row", () => {
+    withPypi(() => {
+        const c = ctx({ installed: ["pipx:harlequin"], remote: [hit("pypi", "harlequin", "SQL IDE"), hit("pypi", "harlequin-mysql", "adapter")] });
+        const rows = S.search("harlequin", c);
+        const h = rows.find(r => r.name === "pipx:harlequin");
+        assert.ok(h && h.installed, "shown as the installed pipx: tool, not a second pypi: copy");
+        assert.ok(!rows.some(r => r.name === "pypi:harlequin"));
+        assert.equal(h.backend, "pipx · SQL IDE");
+        assert.ok(rows.some(r => r.name === "pypi:harlequin-mysql" && !r.installed), "other packages keep the backend mise uses");
+    });
+    assert.equal(S.installedTwin("pypi:x", n => n === "pypi:x"), "pypi:x", "installed as found: unchanged");
+    assert.equal(S.installedTwin("pipx:x", n => n === "pypi:x"), "pypi:x");
+    assert.equal(S.installedTwin("npm:x", () => true), "npm:x");
+});
