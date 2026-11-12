@@ -17,7 +17,7 @@ Three sliders (they save when you let go) cap the rows of a search, in Tools and
 | Setting | Default | Range | Caps |
 | --- | --- | --- | --- |
 | Registry results | 10 | 1-50 | registry rows per search |
-| Live results per backend | 5 | 1-25 | npm, PyPI (`pipx`) and crates.io hits each, for plain text |
+| Live results per backend | 5 | 1-25 | npm, PyPI (`pypi`, or `pipx` on an older mise) and crates.io hits each, for plain text |
 | Live results after `backend:` | 10 | 1-50 | hits for `npm:foo`, `cargo:foo`, ... |
 
 With the defaults, plain text lists up to 10 + 5 + 5 + 5 = 25 rows, and `backend:foo` up to 1 (what you typed) + 10 + 10 = 21.
