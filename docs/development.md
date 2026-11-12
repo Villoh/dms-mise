@@ -1,7 +1,7 @@
 # Development
 
 ```sh
-ln -s "$PWD" ~/.config/DankMaterialShell/plugins/mise
+ln -s "$PWD" ~/.config/dms/plugins/mise  # ~/.config/DankMaterialShell before Dux Shell 2
 dms ipc call plugins reload mise
 ```
 
