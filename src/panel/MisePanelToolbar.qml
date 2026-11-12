@@ -126,7 +126,8 @@ Item {
     DankActionButton {
         id: refreshBtn
         readonly property bool active: toolbar.checking
-        property bool hovered: false
+        // Not `hovered`: Dux Shell 2 buttons inherit a FINAL `hovered` from Qt's templates.
+        property bool pointerOver: false
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
         buttonSize: toolbar.iconBtn
@@ -136,10 +137,10 @@ Item {
         opacity: enabled || active ? 1.0 : 0.5
         radius: active ? height / 2 : Theme.cornerRadius
         border.width: 1
-        border.color: Theme.withAlpha(Theme.primary, hovered ? 0.3 : 0.15)
-        scale: pressed ? 0.92 : (hovered && enabled ? 1.05 : 1.0)
-        onEntered: hovered = true
-        onExited: hovered = false
+        border.color: Theme.withAlpha(Theme.primary, pointerOver ? 0.3 : 0.15)
+        scale: pressed ? 0.92 : (pointerOver && enabled ? 1.05 : 1.0)
+        onEntered: pointerOver = true
+        onExited: pointerOver = false
         onClicked: MiseService.refresh()
 
         Behavior on scale {
@@ -162,7 +163,7 @@ Item {
             color: Theme.primary
             smoothTransform: true
             visible: !refreshBtn.active
-            rotation: refreshBtn.hovered && refreshBtn.enabled ? 180 : 0
+            rotation: refreshBtn.pointerOver && refreshBtn.enabled ? 180 : 0
 
             Behavior on rotation {
                 NumberAnimation {
